@@ -28,8 +28,8 @@ Thumbs.db
 
 # 环境变量
 .env
-# config.json
-# config.db
+config.json
+config.db
 
 # 决策日志
 decision_logs/
