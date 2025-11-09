@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!session?.user?.id) {
-      return NextResponse.redirect(new URL(`/${locale}/login?error=unauthorized`, request.url));
+      return NextResponse.redirect(new URL(`/${locale}/auth/login?error=unauthorized`, request.url));
     }
 
     // Get query parameters

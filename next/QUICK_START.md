@@ -39,16 +39,16 @@ Ready on http://localhost:3000
 
 Visit any of these URLs:
 
-- **Login**: http://localhost:3000/en/auth/password/login
-- **Register**: http://localhost:3000/en/auth/password/register
-- **Reset Password**: http://localhost:3000/en/auth/password/reset-password
+- **Login**: http://localhost:3000/en/auth/go/login
+- **Register**: http://localhost:3000/en/auth/go/register
+- **Reset Password**: http://localhost:3000/en/auth/go/reset-password
 
 ## Quick Test
 
 ### Test System Connection
 
 ```bash
-curl http://localhost:3000/api/go/system-config
+curl http://localhost:3000/api/go/auth/system-config
 ```
 
 Expected response:
@@ -62,7 +62,7 @@ Expected response:
 ### Test Login API
 
 ```bash
-curl -X POST http://localhost:3000/api/go/login \
+curl -X POST http://localhost:3000/api/go/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"Test123!@#"}'
 ```
@@ -72,7 +72,7 @@ curl -X POST http://localhost:3000/api/go/login \
 ```
 next/
 ├── app/
-│   ├── [locale]/auth/password/
+│   ├── [locale]/auth/go/
 │   │   ├── login/page.tsx          # Password login
 │   │   ├── register/page.tsx       # Registration
 │   │   └── reset-password/page.tsx # Password reset
@@ -81,7 +81,7 @@ next/
 │       ├── register/route.ts
 │       └── ... (8 routes total)
 └── contexts/
-    └── password-auth-context.tsx   # Auth state management
+    └── go-auth-context.tsx   # Auth state management
 ```
 
 ## Common Issues

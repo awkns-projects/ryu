@@ -960,6 +960,12 @@
     "description": "Create and manage your AI trading agents. Deploy automated trading strategies with custom parameters and monitor their performance in real-time.",
     "createAgent": "Create Agent",
     "templates": "Templates",
+    "tabs": {
+      "account": "Account",
+      "agents": "Agents",
+      "positions": "Positions",
+      "templates": "Templates"
+    },
     "yourAgents": "Your Trading Agents",
     "noAgents": "No Agents Yet",
     "noAgentsDescription": "Create your first AI trading agent to start automated trading",
@@ -970,6 +976,30 @@
     "deposit": "Deposit",
     "pnl": "P&L",
     "assets": "Assets",
+    "positions": {
+      "title": "Your Positions",
+      "noPositions": "No Positions Yet",
+      "noPositionsDescription": "Your trading positions will appear here. Create an agent to start trading or purchase positions from the marketplace.",
+      "browseMarketplace": "Browse Marketplace",
+      "createAgent": "Create Agent",
+      "openCount": "{open} open / {total} total",
+      "unrealizedPnl": "Unrealized PnL",
+      "entryPrice": "Entry Price",
+      "currentPrice": "Current Price",
+      "quantity": "Quantity",
+      "stopLoss": "Stop Loss",
+      "takeProfit": "Take Profit",
+      "aiAgent": "AI Agent",
+      "marketplace": "Marketplace"
+    },
+    "templatesTab": {
+      "title": "Trading Templates",
+      "noTemplates": "No Templates Available",
+      "noTemplatesDescription": "Browse the marketplace to find and purchase trading templates for your agents.",
+      "browseMarketplace": "Browse Marketplace",
+      "useTemplate": "Use Template",
+      "templatesAvailable": "{count} templates available"
+    },
     "createNewAgent": "Create New Trading Agent",
     "createAgentDescription": "Follow these steps to set up your automated trading agent",
     "step1Title": "Step 1: Name Your Agent",

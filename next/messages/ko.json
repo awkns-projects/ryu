@@ -960,6 +960,12 @@
     "description": "AI 거래 에이전트를 생성하고 관리하세요. 맞춤형 매개변수로 자동 거래 전략을 배포하고 실시간으로 성과를 모니터링하세요.",
     "createAgent": "에이전트 생성",
     "templates": "템플릿",
+    "tabs": {
+      "account": "계정",
+      "agents": "에이전트",
+      "positions": "포지션",
+      "templates": "템플릿"
+    },
     "yourAgents": "거래 에이전트",
     "noAgents": "아직 에이전트 없음",
     "noAgentsDescription": "자동 거래를 시작하려면 첫 번째 AI 거래 에이전트를 생성하세요",
@@ -970,6 +976,30 @@
     "deposit": "입금",
     "pnl": "손익",
     "assets": "자산",
+    "positions": {
+      "title": "포지션",
+      "noPositions": "아직 포지션 없음",
+      "noPositionsDescription": "거래 포지션이 여기에 표시됩니다. 에이전트를 생성하여 거래를 시작하거나 마켓플레이스에서 포지션을 구매하세요.",
+      "browseMarketplace": "마켓플레이스 탐색",
+      "createAgent": "에이전트 생성",
+      "openCount": "{open}개 오픈 / 총 {total}개",
+      "unrealizedPnl": "미실현 손익",
+      "entryPrice": "진입 가격",
+      "currentPrice": "현재 가격",
+      "quantity": "수량",
+      "stopLoss": "손절매",
+      "takeProfit": "익절매",
+      "aiAgent": "AI 에이전트",
+      "marketplace": "마켓플레이스"
+    },
+    "templatesTab": {
+      "title": "거래 템플릿",
+      "noTemplates": "사용 가능한 템플릿 없음",
+      "noTemplatesDescription": "마켓플레이스를 탐색하여 에이전트용 거래 템플릿을 찾고 구매하세요.",
+      "browseMarketplace": "마켓플레이스 탐색",
+      "useTemplate": "템플릿 사용",
+      "templatesAvailable": "사용 가능한 템플릿 {count}개"
+    },
     "createNewAgent": "새 거래 에이전트 생성",
     "createAgentDescription": "다음 단계에 따라 자동 거래 에이전트를 설정하세요",
     "step1Title": "1단계: 에이전트 이름 지정",

@@ -22,16 +22,28 @@ type Agent = {
   changelog: { version: string; date: string; changes: string[] }[]
 }
 
-const AGENTS: Record<string, Agent> = {
+// Helper function to generate consistent values based on string (for consistent ratings/users)
+const getConsistentValue = (str: string, min: number, max: number): number => {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i)
+    hash = hash & hash
+  }
+  const normalized = Math.abs(hash % 1000) / 1000
+  return Math.floor(min + normalized * (max - min))
+}
+
+// Static agents with full details
+const STATIC_AGENTS: Record<string, Agent> = {
   "momentum-master": {
     id: "momentum-master",
     name: "Momentum Master",
-    description: "High-frequency trading strategy using advanced momentum indicators and machine learning",
+    description: "High-frequency trading strategy using advanced momentum indicators and machine learning for rapid market movements",
     longDescription: "Momentum Master is a sophisticated AI-powered trading agent that leverages cutting-edge machine learning algorithms to identify and capitalize on market momentum. With advanced technical indicators and real-time analysis, this agent executes high-frequency trades to maximize profit potential while managing risk effectively.",
     price: 299,
     rating: 4.8,
-    users: 1243,
-    icon: "/images/agents/2.png",
+    users: 1843,
+    icon: "/images/agents/4.png",
     category: "Trading Bot",
     tags: ["Momentum", "High-Frequency", "ML"],
     features: [
@@ -71,11 +83,11 @@ const AGENTS: Record<string, Agent> = {
   "volatility-hunter": {
     id: "volatility-hunter",
     name: "Volatility Hunter",
-    description: "Capitalize on market volatility with AI-powered risk management and dynamic position sizing",
+    description: "Capitalize on market volatility with AI-powered risk management and dynamic position sizing for maximum profit",
     longDescription: "Volatility Hunter specializes in identifying and exploiting market volatility patterns. Using advanced statistical analysis and AI, this agent detects volatility spikes and executes strategic trades with sophisticated risk management to protect your capital while maximizing returns.",
     price: 199,
     rating: 4.6,
-    users: 892,
+    users: 1292,
     icon: "/images/agents/5.png",
     category: "Trading Bot",
     tags: ["Volatility", "Risk Management", "AI"],
@@ -107,12 +119,12 @@ const AGENTS: Record<string, Agent> = {
   "dca-smart-bot": {
     id: "dca-smart-bot",
     name: "DCA Smart Bot",
-    description: "Dollar-cost averaging strategy optimized by AI for maximum long-term gains",
+    description: "Dollar-cost averaging strategy optimized by AI for maximum long-term gains with minimal risk exposure",
     longDescription: "DCA Smart Bot revolutionizes the traditional dollar-cost averaging strategy with AI optimization. Instead of blind periodic purchases, this agent analyzes market conditions, sentiment, and technical indicators to determine the optimal timing and sizing for your DCA investments.",
     price: 149,
     rating: 4.9,
-    users: 2156,
-    icon: "/images/agents/7.png",
+    users: 2656,
+    icon: "/images/agents/6.png",
     category: "Investment",
     tags: ["DCA", "Long-term", "Passive"],
     features: [
@@ -140,42 +152,114 @@ const AGENTS: Record<string, Agent> = {
       }
     ]
   },
-  "swing-trader-pro": {
-    id: "swing-trader-pro",
-    name: "Swing Trader Pro",
-    description: "Multi-timeframe swing trading with AI sentiment analysis and technical indicators",
-    longDescription: "Swing Trader Pro is designed for traders who want to capture medium-term price movements. Using multi-timeframe analysis, AI-powered sentiment detection, and comprehensive technical indicators, this agent identifies high-probability swing trading opportunities and manages positions from entry to exit.",
-    price: 249,
+  "scalper-pro": {
+    id: "scalper-pro",
+    name: "Scalper Pro",
+    description: "Lightning-fast scalping strategy for quick profits on small price movements with high win rate",
+    longDescription: "Scalper Pro is designed for traders who thrive on quick, small profits. Using ultra-low-latency connections and advanced tick-level analysis, this agent identifies and exploits micro price movements with high precision and minimal risk exposure.",
+    price: 349,
     rating: 4.7,
-    users: 1087,
-    icon: "/images/agents/3.png",
+    users: 987,
+    icon: "/images/agents/7.png",
     category: "Trading Bot",
-    tags: ["Swing Trading", "Multi-timeframe", "Sentiment"],
+    tags: ["Scalping", "High-Speed", "Precision"],
     features: [
-      "Multi-timeframe trend analysis",
-      "AI-powered sentiment analysis from social media and news",
-      "Comprehensive technical indicator suite",
-      "Smart entry and exit optimization",
-      "Position management with trailing stops",
-      "Real-time alerts and notifications"
+      "Ultra-low latency execution (sub-millisecond)",
+      "Tick-level price action analysis",
+      "High-frequency order book monitoring",
+      "Advanced spread and slippage management",
+      "Automated profit-taking and loss-cutting",
+      "Real-time performance metrics and alerts"
     ],
     requirements: [
-      "Trading account with margin support",
-      "Minimum $2,000 account balance",
-      "Understanding of swing trading principles"
+      "VPS with low-latency exchange connection",
+      "Minimum $5,000 account balance",
+      "Understanding of high-frequency trading risks"
     ],
     changelog: [
       {
-        version: "2.5.0",
-        date: "2024-01-12",
+        version: "1.5.0",
+        date: "2024-01-18",
         changes: [
-          "Improved sentiment analysis accuracy",
-          "Added support for crypto derivatives",
-          "Enhanced notification system"
+          "Reduced execution latency by 40%",
+          "Added support for maker rebates",
+          "Improved order book depth analysis"
         ]
       }
     ]
-  }
+  },
+  "trend-rider": {
+    id: "trend-rider",
+    name: "Trend Rider",
+    description: "Ride major market trends with intelligent entry and exit points powered by deep learning algorithms",
+    longDescription: "Trend Rider uses deep learning neural networks to identify and follow major market trends across multiple timeframes. By analyzing historical patterns, market structure, and momentum indicators, this agent enters trends early and exits before reversals.",
+    price: 229,
+    rating: 4.8,
+    users: 1543,
+    icon: "/images/agents/8.png",
+    category: "Trading Bot",
+    tags: ["Trend Following", "Deep Learning", "Smart"],
+    features: [
+      "Deep learning trend prediction models",
+      "Multi-timeframe trend confirmation",
+      "Smart entry and exit optimization",
+      "Adaptive position sizing based on trend strength",
+      "Automated trailing stop management",
+      "Comprehensive trend analytics dashboard"
+    ],
+    requirements: [
+      "Exchange API with futures support",
+      "Minimum $3,000 account balance",
+      "Patience for holding positions (days to weeks)"
+    ],
+    changelog: [
+      {
+        version: "2.2.0",
+        date: "2024-01-14",
+        changes: [
+          "Enhanced neural network architecture",
+          "Added cross-asset trend correlation",
+          "Improved exit timing accuracy"
+        ]
+      }
+    ]
+  },
+  "range-master": {
+    id: "range-master",
+    name: "Range Master",
+    description: "Trade within established price ranges using support and resistance levels with high accuracy",
+    longDescription: "Range Master excels in sideways markets by identifying support and resistance levels with high precision. Using statistical analysis and machine learning, this agent buys at support and sells at resistance, capitalizing on mean reversion patterns.",
+    price: 179,
+    rating: 4.5,
+    users: 876,
+    icon: "/images/agents/9.png",
+    category: "Trading Bot",
+    tags: ["Range Trading", "Technical Analysis", "Stable"],
+    features: [
+      "Automated support/resistance identification",
+      "Mean reversion probability analysis",
+      "Multi-asset range detection",
+      "Conservative risk management",
+      "Real-time range breakout alerts",
+      "Detailed range trading statistics"
+    ],
+    requirements: [
+      "Exchange API access",
+      "Minimum $1,500 account balance",
+      "Best suited for low-volatility markets"
+    ],
+    changelog: [
+      {
+        version: "1.4.0",
+        date: "2024-01-08",
+        changes: [
+          "Improved range detection algorithm",
+          "Added breakout filtering",
+          "Enhanced position management"
+        ]
+      }
+    ]
+  },
 }
 
 // Buying Section Component
@@ -250,18 +334,157 @@ const BuyingSection = ({
   )
 }
 
+// Helper function to generate agent details from template
+const generateAgentDetailsFromTemplate = (templateName: string, templateContent: string, baseAgent: Partial<Agent>): Agent => {
+  const defaultFeatures = [
+    `Advanced AI strategy based on ${templateName} prompt template`,
+    "Real-time market analysis and decision making",
+    "Automated trade execution with risk management",
+    "Comprehensive backtesting capabilities",
+    "24/7 monitoring and alert system",
+    "Integration with major crypto exchanges"
+  ]
+
+  const defaultRequirements = [
+    "Exchange API keys (Binance, etc.)",
+    "Minimum account balance of $500",
+    "Stable internet connection for continuous operation"
+  ]
+
+  const defaultChangelog = [
+    {
+      version: "1.0.0",
+      date: new Date().toISOString().split('T')[0],
+      changes: [
+        "Initial release with optimized trading strategy",
+        "Integration with exchange APIs",
+        "Basic risk management features"
+      ]
+    }
+  ]
+
+  return {
+    id: baseAgent.id!,
+    name: baseAgent.name!,
+    description: baseAgent.description!,
+    longDescription: `This advanced AI trading agent is powered by the ${templateName} prompt template. ${templateContent ? 'It uses sophisticated algorithms and market analysis to execute trades automatically based on proven strategies.' : 'It combines technical analysis, market sentiment, and risk management to maximize your trading performance while protecting your capital.'}`,
+    price: baseAgent.price!,
+    rating: baseAgent.rating!,
+    users: baseAgent.users!,
+    icon: baseAgent.icon!,
+    category: baseAgent.category!,
+    tags: baseAgent.tags!,
+    features: defaultFeatures,
+    requirements: defaultRequirements,
+    changelog: defaultChangelog,
+  }
+}
+
 export default function MarketplaceAgentPage() {
   const t = useTranslations('agentPage')
   const params = useParams()
   const router = useRouter()
   const [isPageLoaded, setIsPageLoaded] = useState(false)
   const [showMinimized, setShowMinimized] = useState(false)
+  const [agent, setAgent] = useState<Agent | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const currentLocale = useLocale()
   const buyingSectionRef = useRef<HTMLDivElement>(null)
 
   const agentId = params.id as string
   const locale = params.locale as string || 'en'
-  const agent = AGENTS[agentId]
+
+  // Fetch agent data
+  useEffect(() => {
+    const fetchAgent = async () => {
+      setIsLoading(true)
+      
+      // First, check if it's a static agent
+      if (STATIC_AGENTS[agentId]) {
+        setAgent(STATIC_AGENTS[agentId])
+        setIsLoading(false)
+        return
+      }
+
+      // Otherwise, try to fetch from Go API templates
+      try {
+        const response = await fetch('/api/go/prompt-templates')
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch templates')
+        }
+        
+        const data = await response.json()
+        
+        // Map template names to agent images (0-9)
+        const templateImageMap: Record<string, number> = {
+          'default': 0,
+          'nof1': 1,
+          'taro_long_prompts': 2,
+          'Hansen': 3,
+        }
+        
+        const templatePriceMap: Record<string, number> = {
+          'default': 99,
+          'nof1': 149,
+          'taro_long_prompts': 199,
+          'Hansen': 249,
+        }
+        
+        const templateTagsMap: Record<string, string[]> = {
+          'default': ['Balanced', 'All Markets', 'Beginner-Friendly'],
+          'nof1': ['Advanced', 'High-Frequency', 'ML'],
+          'taro_long_prompts': ['Long-term', 'Risk Management', 'AI'],
+          'Hansen': ['Swing Trading', 'Multi-timeframe', 'Expert'],
+        }
+
+        // Find matching template
+        const template = data.templates?.find((t: { name: string }) => 
+          t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') === agentId
+        )
+
+        if (!template) {
+          setAgent(null)
+          setIsLoading(false)
+          return
+        }
+
+        // Fetch full template content
+        const templateResponse = await fetch(`/api/go/prompt-templates/${template.name}`)
+        const templateData = templateResponse.ok ? await templateResponse.json() : { content: '' }
+
+        // Generate agent from template with CONSISTENT values
+        const baseAgent = {
+          id: agentId,
+          name: template.name.split('_').map((word: string) => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' '),
+          description: `Advanced AI trading strategy powered by ${template.name} prompt template with optimized risk management`,
+          price: templatePriceMap[template.name] || 149,
+          rating: (45 + getConsistentValue(template.name, 0, 4)) / 10, // Consistent 4.5-4.9 rating
+          users: getConsistentValue(template.name, 500, 2500), // Consistent 500-2500 users
+          icon: `/images/agents/${templateImageMap[template.name] ?? 0}.png`,
+          category: 'Trading Bot',
+          tags: templateTagsMap[template.name] || ['AI Trading', 'Automated', 'Smart'],
+        }
+
+        const fullAgent = generateAgentDetailsFromTemplate(
+          template.name,
+          templateData.content || '',
+          baseAgent
+        )
+
+        setAgent(fullAgent)
+      } catch (err) {
+        console.error('Error fetching agent:', err)
+        setAgent(null)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchAgent()
+  }, [agentId])
 
   // Trigger entrance animation
   useEffect(() => {
@@ -294,12 +517,26 @@ export default function MarketplaceAgentPage() {
     }
   }, [])
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-black">
+        <MarketplaceHeader locale={locale} activeTab="marketplace" />
+        <div className="flex items-center justify-center" style={{ minHeight: "calc(100vh - 73px)" }}>
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-white/10 border-t-white/60 rounded-full animate-spin"></div>
+            <p className="text-white/60 text-sm">Loading agent details...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Not found state
   if (!agent) {
     return (
       <div className="min-h-screen bg-black">
-        {/* Header */}
         <MarketplaceHeader locale={locale} activeTab="marketplace" />
-
         <div className="flex items-center justify-center" style={{ minHeight: "calc(100vh - 73px)" }}>
           <div className="text-center">
             <h1 className="text-2xl font-medium text-white mb-4">{t('notFound')}</h1>

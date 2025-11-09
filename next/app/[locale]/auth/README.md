@@ -24,7 +24,7 @@ auth/
 
 Located in `auth/password/`, this method uses traditional email and password credentials with optional two-factor authentication.
 
-#### Login (`/auth/password/login`)
+#### Login (`/auth/go/login`)
 **Features:**
 - Email and password authentication
 - Two-step flow:
@@ -35,12 +35,12 @@ Located in `auth/password/`, this method uses traditional email and password cre
 - Link to registration page
 
 **Implementation:**
-- Uses `usePasswordAuth` context from `/contexts/password-auth-context.tsx`
+- Uses `useGoAuth` context from `/contexts/go-auth-context.tsx`
 - Calls `/api/login` endpoint
 - Calls `/api/verify-otp` for 2FA verification
 - Stores auth token and user info in localStorage
 
-#### Register (`/auth/password/register`)
+#### Register (`/auth/go/register`)
 **Features:**
 - Three-step registration flow:
   1. **Register**: Email, password, confirm password, optional beta code
@@ -60,12 +60,12 @@ Located in `auth/password/`, this method uses traditional email and password cre
 - Checked via `/api/system-config` endpoint
 
 **Implementation:**
-- Uses `usePasswordAuth` context
+- Uses `useGoAuth` context
 - Calls `/api/register` to create account and get OTP secret
 - Displays QR code for scanning with authenticator app
 - Calls `/api/complete-registration` to verify OTP and complete setup
 
-#### Reset Password (`/auth/password/reset-password`)
+#### Reset Password (`/auth/go/reset-password`)
 **Features:**
 - Single-step password reset with 2FA verification
 - Email input
@@ -81,7 +81,7 @@ Located in `auth/password/`, this method uses traditional email and password cre
 - New password must meet all password requirements
 
 **Implementation:**
-- Uses `usePasswordAuth` context
+- Uses `useGoAuth` context
 - Calls `/api/reset-password` with email, new password, and OTP code
 - Validates password strength before submission
 - Redirects to login page after successful reset
@@ -90,7 +90,7 @@ Located in `auth/password/`, this method uses traditional email and password cre
 
 Located in `auth/passwordless/`, this method uses email-only authentication with one-time codes sent via email.
 
-#### Login (`/auth/passwordless/login`)
+#### Login (`/auth/login`)
 **Features:**
 - Email-only authentication
 - Two-step flow:
@@ -107,9 +107,9 @@ Located in `auth/passwordless/`, this method uses email-only authentication with
 
 ## Context Providers
 
-### PasswordAuthProvider
+### GoAuthProvider
 
-Located at `/contexts/password-auth-context.tsx`, this context provides:
+Located at `/contexts/go-auth-context.tsx`, this context provides:
 
 **State:**
 - `user: User | null` - Current user object
@@ -148,35 +148,35 @@ The authentication system uses these API endpoints:
 
 ### Password-Based Endpoints
 
-**POST /api/go/login** (proxies to Go backend `/api/login`)
+**POST /api/go/auth/login** (proxies to Go backend `/api/login`)
 - Request: `{ email, password }`
 - Response: `{ requires_otp: boolean, user_id: string, message: string }` or `{ error: string }`
 
-**POST /api/go/register** (proxies to Go backend `/api/register`)
+**POST /api/go/auth/register** (proxies to Go backend `/api/register`)
 - Request: `{ email, password, beta_code?: string }`
 - Response: `{ user_id, otp_secret, qr_code_url, message }` or `{ error }`
 
-**POST /api/go/verify-otp** (proxies to Go backend `/api/verify-otp`)
+**POST /api/go/auth/verify-otp** (proxies to Go backend `/api/verify-otp`)
 - Request: `{ user_id, otp_code }`
 - Response: `{ token, user_id, email, message }` or `{ error }`
 
-**POST /api/go/complete-registration** (proxies to Go backend `/api/complete-registration`)
+**POST /api/go/auth/complete-registration** (proxies to Go backend `/api/complete-registration`)
 - Request: `{ user_id, otp_code }`
 - Response: `{ token, user_id, email, message }` or `{ error }`
 
-**POST /api/go/reset-password** ✨ (proxies to Go backend `/api/reset-password`)
+**POST /api/go/auth/reset-password** ✨ (proxies to Go backend `/api/reset-password`)
 - Request: `{ email, new_password, otp_code }`
 - Response: `{ message }` or `{ error }`
 - Note: User must have 2FA configured to reset password
 
-**POST /api/go/admin-login** (proxies to Go backend `/api/admin-login`)
+**POST /api/go/auth/admin-login** (proxies to Go backend `/api/admin-login`)
 - Request: `{ password }`
 - Response: `{ token, user_id, email }` or `{ error }`
 
-**POST /api/go/logout** (proxies to Go backend `/api/logout`)
+**POST /api/go/auth/logout** (proxies to Go backend `/api/logout`)
 - Headers: `Authorization: Bearer {token}`
 
-**GET /api/go/system-config** (proxies to Go backend `/api/system-config`)
+**GET /api/go/auth/system-config** (proxies to Go backend `/api/system-config`)
 - Response: `{ beta_mode: boolean, ... }`
 
 ### Passwordless Endpoints
@@ -213,11 +213,11 @@ All authentication pages follow the pattern:
 ```
 
 Examples:
-- `/en/auth/password/login`
-- `/en/auth/password/register`
-- `/en/auth/password/reset-password` ✨
-- `/en/auth/passwordless/login`
-- `/zh/auth/password/login`
+- `/en/auth/go/login`
+- `/en/auth/go/register`
+- `/en/auth/go/reset-password` ✨
+- `/en/auth/login`
+- `/zh/auth/go/login`
 
 ## Redirect Handling
 
@@ -225,7 +225,7 @@ After successful authentication, users are redirected to:
 1. URL specified in `?redirect=` query parameter
 2. Home page (`/{locale}`) if no redirect is specified
 
-Example: `/en/auth/password/login?redirect=/dashboard` → redirects to `/dashboard` after login
+Example: `/en/auth/go/login?redirect=/dashboard` → redirects to `/dashboard` after login
 
 ## Security Features
 
@@ -246,9 +246,9 @@ Example: `/en/auth/password/login?redirect=/dashboard` → redirects to `/dashbo
 
 ### Password Login
 ```typescript
-import { usePasswordAuth } from "@/contexts/password-auth-context";
+import { useGoAuth } from "@/contexts/go-auth-context";
 
-const { login, verifyOTP } = usePasswordAuth();
+const { login, verifyOTP } = useGoAuth();
 
 // Step 1: Login with credentials
 const result = await login(email, password);
@@ -260,9 +260,9 @@ if (result.success && result.requiresOTP) {
 
 ### Password Registration
 ```typescript
-import { usePasswordAuth } from "@/contexts/password-auth-context";
+import { useGoAuth } from "@/contexts/go-auth-context";
 
-const { register, completeRegistration } = usePasswordAuth();
+const { register, completeRegistration } = useGoAuth();
 
 // Step 1: Register
 const result = await register(email, password, betaCode);
@@ -275,15 +275,15 @@ if (result.success) {
 
 ### Password Reset ✨
 ```typescript
-import { usePasswordAuth } from "@/contexts/password-auth-context";
+import { useGoAuth } from "@/contexts/go-auth-context";
 
-const { resetPassword } = usePasswordAuth();
+const { resetPassword } = useGoAuth();
 
 // Reset password with OTP verification
 const result = await resetPassword(email, newPassword, otpCode);
 if (result.success) {
   // Password reset successful, redirect to login
-  router.push(`/${locale}/auth/password/login`);
+  router.push(`/${locale}/auth/go/login`);
 }
 ```
 

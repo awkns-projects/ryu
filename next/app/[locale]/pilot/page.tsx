@@ -114,7 +114,7 @@ export default function PilotTestingPage() {
   // Protect the page - redirect to login if not authenticated
   useEffect(() => {
     if (!isPending && !session) {
-      router.push(`/${locale}/login?redirect=${encodeURIComponent(`/${locale}/pilot`)}`)
+      router.push(`/${locale}/auth/login?redirect=${encodeURIComponent(`/${locale}/pilot`)}`)
     }
   }, [session, isPending, router, locale])
 

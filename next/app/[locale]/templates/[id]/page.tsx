@@ -114,7 +114,7 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
     // Check if user is authenticated
     if (!session) {
       // Redirect to login with current page as redirect destination
-      router.push(`/${locale}/login?redirect=${encodeURIComponent(`/${locale}/templates/${template.id}`)}`)
+      router.push(`/${locale}/auth/login?redirect=${encodeURIComponent(`/${locale}/templates/${template.id}`)}`)
       return
     }
 
@@ -163,7 +163,7 @@ export default function TemplateDetailPage({ params }: { params: Promise<{ id: s
       if (err.message?.includes('log in') || err.message?.includes('Authentication')) {
         setShowNameDialog(false)
         setTimeout(() => {
-          router.push(`/${locale}/login?redirect=${encodeURIComponent(`/${locale}/templates/${template.id}`)}`)
+          router.push(`/${locale}/auth/login?redirect=${encodeURIComponent(`/${locale}/templates/${template.id}`)}`)
         }, 2000)
       }
     } finally {

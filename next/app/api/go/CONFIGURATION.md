@@ -56,7 +56,7 @@ The Next.js server starts on `http://localhost:3000`
 curl http://localhost:8080/api/system-config
 
 # Test via Next.js proxy
-curl http://localhost:3000/api/go/system-config
+curl http://localhost:3000/api/go/auth/system-config
 ```
 
 ## Production Setup
@@ -135,7 +135,7 @@ Or set in Netlify dashboard: Site Settings → Environment Variables
 
 ```bash
 # Test system config endpoint
-curl http://localhost:3000/api/go/system-config
+curl http://localhost:3000/api/go/auth/system-config
 ```
 
 Expected response:
@@ -150,7 +150,7 @@ Expected response:
 
 ```bash
 # Test login endpoint
-curl -X POST http://localhost:3000/api/go/login \
+curl -X POST http://localhost:3000/api/go/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"password123"}'
 ```

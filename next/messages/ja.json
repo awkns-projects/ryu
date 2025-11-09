@@ -960,6 +960,12 @@
     "description": "AIトレーディングエージェントを作成して管理します。カスタムパラメータで自動トレーディング戦略をデプロイし、リアルタイムでパフォーマンスを監視します。",
     "createAgent": "エージェント作成",
     "templates": "テンプレート",
+    "tabs": {
+      "account": "アカウント",
+      "agents": "エージェント",
+      "positions": "ポジション",
+      "templates": "テンプレート"
+    },
     "yourAgents": "トレーディングエージェント",
     "noAgents": "エージェントがまだありません",
     "noAgentsDescription": "自動トレーディングを開始するには最初のAIトレーディングエージェントを作成してください",
@@ -970,6 +976,30 @@
     "deposit": "入金",
     "pnl": "損益",
     "assets": "資産",
+    "positions": {
+      "title": "ポジション",
+      "noPositions": "ポジションがまだありません",
+      "noPositionsDescription": "トレーディングポジションはここに表示されます。エージェントを作成して取引を開始するか、マーケットプレイスでポジションを購入してください。",
+      "browseMarketplace": "マーケットプレイスを閲覧",
+      "createAgent": "エージェント作成",
+      "openCount": "{open}建玉 / 合計{total}",
+      "unrealizedPnl": "未実現損益",
+      "entryPrice": "エントリー価格",
+      "currentPrice": "現在価格",
+      "quantity": "数量",
+      "stopLoss": "ストップロス",
+      "takeProfit": "テイクプロフィット",
+      "aiAgent": "AIエージェント",
+      "marketplace": "マーケットプレイス"
+    },
+    "templatesTab": {
+      "title": "トレーディングテンプレート",
+      "noTemplates": "利用可能なテンプレートがありません",
+      "noTemplatesDescription": "マーケットプレイスを閲覧してエージェント用のトレーディングテンプレートを見つけて購入してください。",
+      "browseMarketplace": "マーケットプレイスを閲覧",
+      "useTemplate": "テンプレートを使用",
+      "templatesAvailable": "{count}個の利用可能なテンプレート"
+    },
     "createNewAgent": "新規トレーディングエージェント作成",
     "createAgentDescription": "次のステップに従って自動トレーディングエージェントをセットアップ",
     "step1Title": "ステップ1: エージェントに名前を付ける",

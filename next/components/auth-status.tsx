@@ -38,17 +38,17 @@ export function AuthStatus() {
 
   if (!session) {
     // Determine redirect URL based on current page
-    let loginUrl = `/${locale}/login`;
+    let loginUrl = `/${locale}/auth/login`;
 
-    if (pathname === `/${locale}/login`) {
+    if (pathname === `/${locale}/auth/login`) {
       // Already on login page - no redirect param
-      loginUrl = `/${locale}/login`;
+      loginUrl = `/${locale}/auth/login`;
     } else if (pathname === `/${locale}` || pathname === '/') {
       // On home page - redirect to my-agents after login
-      loginUrl = `/${locale}/login?redirect=${encodeURIComponent(`/${locale}/my-agents`)}`;
+      loginUrl = `/${locale}/auth/login?redirect=${encodeURIComponent(`/${locale}/my-agents`)}`;
     } else {
       // On any other page - redirect back to current page
-      loginUrl = `/${locale}/login?redirect=${encodeURIComponent(pathname)}`;
+      loginUrl = `/${locale}/auth/login?redirect=${encodeURIComponent(pathname)}`;
     }
 
     return (

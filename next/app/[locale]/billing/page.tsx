@@ -91,7 +91,7 @@ export default function BillingPage() {
     }
 
     if (!userId) {
-      window.location.href = `/${locale}/login?redirect=${encodeURIComponent(`/${locale}/billing`)}`;
+      window.location.href = `/${locale}/auth/login?redirect=${encodeURIComponent(`/${locale}/billing`)}`;
       return;
     }
 
@@ -341,7 +341,7 @@ export default function BillingPage() {
           email={userEmail}
           onSubscribe={handleSubscribe}
           onEmailClick={() => {
-            window.location.href = `/${locale}/login?redirect=${encodeURIComponent(`/${locale}/billing`)}`;
+            window.location.href = `/${locale}/auth/login?redirect=${encodeURIComponent(`/${locale}/billing`)}`;
           }}
         />
       )}

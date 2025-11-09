@@ -45,6 +45,87 @@ type Position = {
   totalBids?: number
 }
 
+// Helper function to generate consistent values based on string (for consistent ratings/users)
+const getConsistentValue = (str: string, min: number, max: number): number => {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i)
+    hash = hash & hash
+  }
+  const normalized = Math.abs(hash % 1000) / 1000
+  return Math.floor(min + normalized * (max - min))
+}
+
+// Static example agents (defined outside component to avoid recreation)
+const STATIC_AGENTS: Agent[] = [
+  {
+    id: "momentum-master",
+    name: "Momentum Master",
+    description: "High-frequency trading strategy using advanced momentum indicators and machine learning for rapid market movements",
+    price: 299,
+    rating: 4.8,
+    users: 1843,
+    icon: "/images/agents/4.png",
+    category: "Trading Bot",
+    tags: ["Momentum", "High-Frequency", "ML"]
+  },
+  {
+    id: "volatility-hunter",
+    name: "Volatility Hunter",
+    description: "Capitalize on market volatility with AI-powered risk management and dynamic position sizing for maximum profit",
+    price: 199,
+    rating: 4.6,
+    users: 1292,
+    icon: "/images/agents/5.png",
+    category: "Trading Bot",
+    tags: ["Volatility", "Risk Management", "AI"]
+  },
+  {
+    id: "dca-smart-bot",
+    name: "DCA Smart Bot",
+    description: "Dollar-cost averaging strategy optimized by AI for maximum long-term gains with minimal risk exposure",
+    price: 149,
+    rating: 4.9,
+    users: 2656,
+    icon: "/images/agents/6.png",
+    category: "Investment",
+    tags: ["DCA", "Long-term", "Passive"]
+  },
+  {
+    id: "scalper-pro",
+    name: "Scalper Pro",
+    description: "Lightning-fast scalping strategy for quick profits on small price movements with high win rate",
+    price: 349,
+    rating: 4.7,
+    users: 987,
+    icon: "/images/agents/7.png",
+    category: "Trading Bot",
+    tags: ["Scalping", "High-Speed", "Precision"]
+  },
+  {
+    id: "trend-rider",
+    name: "Trend Rider",
+    description: "Ride major market trends with intelligent entry and exit points powered by deep learning algorithms",
+    price: 229,
+    rating: 4.8,
+    users: 1543,
+    icon: "/images/agents/8.png",
+    category: "Trading Bot",
+    tags: ["Trend Following", "Deep Learning", "Smart"]
+  },
+  {
+    id: "range-master",
+    name: "Range Master",
+    description: "Trade within established price ranges using support and resistance levels with high accuracy",
+    price: 179,
+    rating: 4.5,
+    users: 876,
+    icon: "/images/agents/9.png",
+    category: "Trading Bot",
+    tags: ["Range Trading", "Technical Analysis", "Stable"]
+  },
+]
+
 export default function MarketplacePage() {
   const t = useTranslations('marketplacePage')
   const tSection = useTranslations('marketplaceSection')
@@ -65,6 +146,77 @@ export default function MarketplacePage() {
   const [isTabSwitching, setIsTabSwitching] = useState(false)
   const [isNavigating, setIsNavigating] = useState(false)
   const [itemsAnimated, setItemsAnimated] = useState(false)
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [isLoadingAgents, setIsLoadingAgents] = useState(true)
+
+  // Fetch agents from Go backend prompt templates
+  useEffect(() => {
+    const fetchAgents = async () => {
+      setIsLoadingAgents(true)
+      try {
+        const response = await fetch('/api/go/prompt-templates')
+        
+        if (!response.ok) {
+          throw new Error('Failed to fetch prompt templates')
+        }
+        
+        const data = await response.json()
+        
+        // Map template names to agent images (0-9)
+        const templateImageMap: Record<string, number> = {
+          'default': 0,
+          'nof1': 1,
+          'taro_long_prompts': 2,
+          'Hansen': 3,
+        }
+        
+        // Map pricing based on template complexity (you can adjust these)
+        const templatePriceMap: Record<string, number> = {
+          'default': 99,
+          'nof1': 149,
+          'taro_long_prompts': 199,
+          'Hansen': 249,
+        }
+        
+        // Map tags based on template
+        const templateTagsMap: Record<string, string[]> = {
+          'default': ['Balanced', 'All Markets', 'Beginner-Friendly'],
+          'nof1': ['Advanced', 'High-Frequency', 'ML'],
+          'taro_long_prompts': ['Long-term', 'Risk Management', 'AI'],
+          'Hansen': ['Swing Trading', 'Multi-timeframe', 'Expert'],
+        }
+        
+        // Transform templates to agents with CONSISTENT values
+        const dynamicAgents: Agent[] = data.templates?.map((t: { name: string }, index: number) => ({
+          id: t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          name: t.name.split('_').map((word: string) => 
+            word.charAt(0).toUpperCase() + word.slice(1)
+          ).join(' '),
+          description: `Advanced AI trading strategy powered by ${t.name} prompt template with optimized risk management`,
+          price: templatePriceMap[t.name] || 149,
+          rating: (45 + getConsistentValue(t.name, 0, 4)) / 10, // Consistent 4.5-4.9 rating
+          users: getConsistentValue(t.name, 500, 2500), // Consistent 500-2500 users
+          icon: `/images/agents/${templateImageMap[t.name] ?? (index % 10)}.png`,
+          category: 'Trading Bot',
+          tags: templateTagsMap[t.name] || ['AI Trading', 'Automated', 'Smart'],
+        })) || []
+        
+        // Combine dynamic and static agents
+        const allAgents = [...dynamicAgents, ...STATIC_AGENTS]
+        setAgents(allAgents)
+        console.log('✅ Fetched agents - Dynamic:', dynamicAgents.length, 'Static:', STATIC_AGENTS.length, 'Total:', allAgents.length)
+      } catch (err) {
+        console.error('❌ Failed to fetch agents:', err)
+        // Fallback to static agents only if API fails
+        setAgents(STATIC_AGENTS)
+        console.log('⚠️ Using fallback static agents:', STATIC_AGENTS.length)
+      } finally {
+        setIsLoadingAgents(false)
+      }
+    }
+    
+    fetchAgents()
+  }, [])
 
   // Trigger entrance animation
   useEffect(() => {
@@ -121,53 +273,6 @@ export default function MarketplacePage() {
     { id: "META", name: "Meta Platforms", symbol: "META", disabled: true },
     { id: "AMZN", name: "Amazon.com Inc.", symbol: "AMZN", disabled: true },
     { id: "JPM", name: "JPMorgan Chase", symbol: "JPM", disabled: true },
-  ]
-
-  const agents: Agent[] = [
-    {
-      id: "momentum-master",
-      name: "Momentum Master",
-      description: "High-frequency trading strategy using advanced momentum indicators and machine learning",
-      price: 299,
-      rating: 4.8,
-      users: 1243,
-      icon: "/images/agents/2.png",
-      category: "Trading Bot",
-      tags: ["Momentum", "High-Frequency", "ML"]
-    },
-    {
-      id: "volatility-hunter",
-      name: "Volatility Hunter",
-      description: "Capitalize on market volatility with AI-powered risk management and dynamic position sizing",
-      price: 199,
-      rating: 4.6,
-      users: 892,
-      icon: "/images/agents/5.png",
-      category: "Trading Bot",
-      tags: ["Volatility", "Risk Management", "AI"]
-    },
-    {
-      id: "dca-smart-bot",
-      name: "DCA Smart Bot",
-      description: "Dollar-cost averaging strategy optimized by AI for maximum long-term gains",
-      price: 149,
-      rating: 4.9,
-      users: 2156,
-      icon: "/images/agents/7.png",
-      category: "Investment",
-      tags: ["DCA", "Long-term", "Passive"]
-    },
-    {
-      id: "swing-trader-pro",
-      name: "Swing Trader Pro",
-      description: "Multi-timeframe swing trading with AI sentiment analysis and technical indicators",
-      price: 249,
-      rating: 4.7,
-      users: 1087,
-      icon: "/images/agents/3.png",
-      category: "Trading Bot",
-      tags: ["Swing Trading", "Multi-timeframe", "Sentiment"]
-    }
   ]
 
   const positions: Position[] = [
@@ -579,12 +684,22 @@ export default function MarketplacePage() {
             Showing <span className="font-medium text-white">{filteredItems.length}</span> results
           </div>
 
-          {/* Items Grid/List */}
-          <div className={`${viewMode === "grid"
-            ? "grid sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4"
-            : "space-y-3 md:space-y-4"
-            } transition-all duration-300 ${isTabSwitching || isNavigating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
-            {filteredItems.map((item, index) => {
+          {/* Loading State */}
+          {isLoadingAgents && activeTab === "agents" ? (
+            <div className="flex items-center justify-center py-20">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-12 h-12 border-4 border-white/10 border-t-white/60 rounded-full animate-spin"></div>
+                <p className="text-white/60 text-sm">Loading agents...</p>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Items Grid/List */}
+              <div className={`${viewMode === "grid"
+                ? "grid sm:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4"
+                : "space-y-3 md:space-y-4"
+                } transition-all duration-300 ${isTabSwitching || isNavigating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
+                {filteredItems.map((item, index) => {
               const isPosition = 'entryPrice' in item
               const position = item as Position
               const href = isPosition ? `/${locale}/position/${item.id}` : `/${locale}/marketplace/agent/${item.id}`
@@ -709,26 +824,28 @@ export default function MarketplacePage() {
                 </div>
               )
             })}
-          </div>
+              </div>
 
-          {/* Empty State */}
-          {filteredItems.length === 0 && (
-            <div className="text-center py-20">
-              <div className="text-6xl mb-4">🔍</div>
-              <h3 className="text-2xl font-medium text-black mb-2">{t('noResults').replace('{type}', activeTab === "agents" ? t('agents') : t('positions'))}</h3>
-              <p className="text-black/60 mb-6">{t('tryAdjusting')}</p>
-              <button
-                onClick={() => {
-                  setActiveTab("agents")
-                  setSaleTypeFilter("all")
-                  setAssetFilter([])
-                  setSearchQuery("")
-                }}
-                className="px-6 py-3 rounded-full bg-black text-white text-sm font-medium hover:bg-black/90 transition-all"
-              >
-                Clear All Filters
-              </button>
-            </div>
+              {/* Empty State */}
+              {filteredItems.length === 0 && (
+                <div className="text-center py-20">
+                  <div className="text-6xl mb-4">🔍</div>
+                  <h3 className="text-2xl font-medium text-white mb-2">{t('noResults').replace('{type}', activeTab === "agents" ? t('agents') : t('positions'))}</h3>
+                  <p className="text-white/60 mb-6">{t('tryAdjusting')}</p>
+                  <button
+                    onClick={() => {
+                      setActiveTab("agents")
+                      setSaleTypeFilter("all")
+                      setAssetFilter([])
+                      setSearchQuery("")
+                    }}
+                    className="px-6 py-3 rounded-full bg-white text-black text-sm font-medium hover:bg-white/90 transition-all"
+                  >
+                    Clear All Filters
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

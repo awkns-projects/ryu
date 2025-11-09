@@ -6,9 +6,9 @@ This document summarizes the complete password-based authentication system imple
 
 ## 🎯 What Was Implemented
 
-### 1. Authentication Pages (`/app/[locale]/auth/password/`)
+### 1. Authentication Pages (`/app/[locale]/auth/go/`)
 
-#### Login Page (`/auth/password/login`)
+#### Login Page (`/auth/go/login`)
 - Email and password authentication
 - Two-step flow with OTP verification for 2FA
 - Show/hide password toggle
@@ -16,7 +16,7 @@ This document summarizes the complete password-based authentication system imple
 - Link to registration page
 - Dark theme with consistent styling
 
-#### Register Page (`/auth/password/register`)
+#### Register Page (`/auth/go/register`)
 - Three-step registration flow:
   1. Email, password, and confirm password input
   2. 2FA setup with QR code display
@@ -26,7 +26,7 @@ This document summarizes the complete password-based authentication system imple
 - Password strength indicators
 - Copy to clipboard for OTP secret
 
-#### Reset Password Page (`/auth/password/reset-password`)
+#### Reset Password Page (`/auth/go/reset-password`)
 - Single-step password reset
 - Email, new password, and confirm password fields
 - OTP verification from authenticator app
@@ -37,16 +37,16 @@ This document summarizes the complete password-based authentication system imple
 
 Created 8 Next.js API routes that proxy requests to Go backend on port 8080:
 
-1. **POST `/api/go/login`** - Email/password authentication
-2. **POST `/api/go/verify-otp`** - OTP verification
-3. **POST `/api/go/register`** - User registration
-4. **POST `/api/go/complete-registration`** - Complete registration with OTP
-5. **POST `/api/go/reset-password`** - Password reset with OTP
-6. **POST `/api/go/admin-login`** - Admin authentication
-7. **POST `/api/go/logout`** - User logout
-8. **GET `/api/go/system-config`** - Get system configuration
+1. **POST `/api/go/auth/login`** - Email/password authentication
+2. **POST `/api/go/auth/verify-otp`** - OTP verification
+3. **POST `/api/go/auth/register`** - User registration
+4. **POST `/api/go/auth/complete-registration`** - Complete registration with OTP
+5. **POST `/api/go/auth/reset-password`** - Password reset with OTP
+6. **POST `/api/go/auth/admin-login`** - Admin authentication
+7. **POST `/api/go/auth/logout`** - User logout
+8. **GET `/api/go/auth/system-config`** - Get system configuration
 
-### 3. Authentication Context (`/contexts/password-auth-context.tsx`)
+### 3. Authentication Context (`/contexts/go-auth-context.tsx`)
 
 - Comprehensive auth context provider
 - Methods: login, register, verifyOTP, completeRegistration, resetPassword, loginAdmin, logout
@@ -59,7 +59,7 @@ Created 8 Next.js API routes that proxy requests to Go backend on port 8080:
 - **`/app/[locale]/auth/README.md`** - Complete authentication system documentation
 - **`/app/api/go/README.md`** - Comprehensive API proxy routes documentation
 - **`/app/api/go/CONFIGURATION.md`** - Configuration and deployment guide
-- **`/app/[locale]/auth/password/reset-password/README.md`** - Reset password feature documentation
+- **`/app/[locale]/auth/go/reset-password/README.md`** - Reset password feature documentation
 
 ## 📁 File Structure
 
@@ -142,9 +142,9 @@ User clicks "Login"
   ↓
 usePasswordAuth().login(email, password)
   ↓
-fetch('/api/go/login', { email, password })
+fetch('/api/go/auth/login', { email, password })
   ↓
-Next.js API Route: /app/api/go/login/route.ts
+Next.js API Route: /app/api/go/auth/login/route.ts
   ↓
 fetch('http://localhost:8080/api/login', { email, password })
   ↓
@@ -191,7 +191,7 @@ Next.js dev server starts on `http://localhost:3000`
 
 ### 4. Test the System
 
-Visit: `http://localhost:3000/en/auth/password/login`
+Visit: `http://localhost:3000/en/auth/go/login`
 
 ## 📋 Features Implemented
 
@@ -270,23 +270,23 @@ All authentication pages are accessible at:
 
 ### Available Routes
 
-- `/en/auth/password/login` - Password login
-- `/en/auth/password/register` - Password registration
-- `/en/auth/password/reset-password` - Password reset
-- `/en/auth/passwordless/login` - Email OTP login
-- `/zh/auth/password/login` - Chinese login page
+- `/en/auth/go/login` - Password login
+- `/en/auth/go/register` - Password registration
+- `/en/auth/go/reset-password` - Password reset
+- `/en/auth/login` - Email OTP login
+- `/zh/auth/go/login` - Chinese login page
 - (etc. for other locales)
 
 ### API Routes
 
-- `/api/go/login` - Login proxy
-- `/api/go/register` - Registration proxy
-- `/api/go/verify-otp` - OTP verification proxy
-- `/api/go/complete-registration` - Complete registration proxy
-- `/api/go/reset-password` - Password reset proxy
-- `/api/go/admin-login` - Admin login proxy
-- `/api/go/logout` - Logout proxy
-- `/api/go/system-config` - System config proxy
+- `/api/go/auth/login` - Login proxy
+- `/api/go/auth/register` - Registration proxy
+- `/api/go/auth/verify-otp` - OTP verification proxy
+- `/api/go/auth/complete-registration` - Complete registration proxy
+- `/api/go/auth/reset-password` - Password reset proxy
+- `/api/go/auth/admin-login` - Admin login proxy
+- `/api/go/auth/logout` - Logout proxy
+- `/api/go/auth/system-config` - System config proxy
 
 ## 📊 Testing Checklist
 
@@ -311,15 +311,15 @@ All authentication pages are accessible at:
 
 ```bash
 # Test system config
-curl http://localhost:3000/api/go/system-config
+curl http://localhost:3000/api/go/auth/system-config
 
 # Test login
-curl -X POST http://localhost:3000/api/go/login \
+curl -X POST http://localhost:3000/api/go/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"test@example.com","password":"Test123!@#"}'
 
 # Test register
-curl -X POST http://localhost:3000/api/go/register \
+curl -X POST http://localhost:3000/api/go/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"new@example.com","password":"Test123!@#"}'
 ```
@@ -368,7 +368,7 @@ curl -X POST http://localhost:3000/api/go/register \
 - [Authentication Pages Documentation](/app/[locale]/auth/README.md)
 - [API Proxy Routes Documentation](/app/api/go/README.md)
 - [Configuration Guide](/app/api/go/CONFIGURATION.md)
-- [Reset Password Documentation](/app/[locale]/auth/password/reset-password/README.md)
+- [Reset Password Documentation](/app/[locale]/auth/go/reset-password/README.md)
 
 ## ✅ Verification
 

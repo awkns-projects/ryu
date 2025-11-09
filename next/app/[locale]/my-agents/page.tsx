@@ -55,7 +55,7 @@ export default function MyAgentsPage() {
       // Redirect to login if not authenticated
       if (!session) {
         setIsLoading(false)
-        router.push(`/${locale}/login?redirect=${encodeURIComponent(`/${locale}/my-agents`)}`)
+        router.push(`/${locale}/auth/login?redirect=${encodeURIComponent(`/${locale}/my-agents`)}`)
         return
       }
 
@@ -101,7 +101,7 @@ export default function MyAgentsPage() {
 
         // If authentication error, redirect to login
         if (err.message?.includes('log in') || err.message?.includes('Authentication')) {
-          router.push(`/${locale}/login?redirect=${encodeURIComponent(`/${locale}/my-agents`)}`)
+          router.push(`/${locale}/auth/login?redirect=${encodeURIComponent(`/${locale}/my-agents`)}`)
         }
       } finally {
         setIsLoading(false)

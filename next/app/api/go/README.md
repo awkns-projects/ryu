@@ -27,7 +27,7 @@ GO_API_URL=http://localhost:8080
 
 ## Available Routes
 
-### 1. Login (`POST /api/go/login`)
+### 1. Login (`POST /api/go/auth/login`)
 
 **Purpose**: Authenticate user with email and password
 
@@ -59,7 +59,7 @@ GO_API_URL=http://localhost:8080
 
 ---
 
-### 2. Verify OTP (`POST /api/go/verify-otp`)
+### 2. Verify OTP (`POST /api/go/auth/verify-otp`)
 
 **Purpose**: Verify two-factor authentication code during login
 
@@ -92,7 +92,7 @@ GO_API_URL=http://localhost:8080
 
 ---
 
-### 3. Register (`POST /api/go/register`)
+### 3. Register (`POST /api/go/auth/register`)
 
 **Purpose**: Create a new user account
 
@@ -126,7 +126,7 @@ GO_API_URL=http://localhost:8080
 
 ---
 
-### 4. Complete Registration (`POST /api/go/complete-registration`)
+### 4. Complete Registration (`POST /api/go/auth/complete-registration`)
 
 **Purpose**: Complete registration by verifying OTP setup
 
@@ -159,7 +159,7 @@ GO_API_URL=http://localhost:8080
 
 ---
 
-### 5. Reset Password (`POST /api/go/reset-password`)
+### 5. Reset Password (`POST /api/go/auth/reset-password`)
 
 **Purpose**: Reset user password with OTP verification
 
@@ -190,7 +190,7 @@ GO_API_URL=http://localhost:8080
 
 ---
 
-### 6. Admin Login (`POST /api/go/admin-login`)
+### 6. Admin Login (`POST /api/go/auth/admin-login`)
 
 **Purpose**: Authenticate admin users
 
@@ -221,7 +221,7 @@ GO_API_URL=http://localhost:8080
 
 ---
 
-### 7. Logout (`POST /api/go/logout`)
+### 7. Logout (`POST /api/go/auth/logout`)
 
 **Purpose**: Log out user and invalidate session
 
@@ -248,7 +248,7 @@ Authorization: Bearer {jwt-token}
 
 ---
 
-### 8. System Config (`GET /api/go/system-config`)
+### 8. System Config (`GET /api/go/auth/system-config`)
 
 **Purpose**: Get system configuration (e.g., beta mode status)
 
@@ -348,7 +348,7 @@ const result = await resetPassword(email, newPassword, otpCode);
 You can also call the routes directly:
 
 ```typescript
-const response = await fetch('/api/go/login', {
+const response = await fetch('/api/go/auth/login', {
   method: 'POST',
   headers: {
     'Content-Type': 'application/json',
@@ -362,20 +362,20 @@ const data = await response.json();
 ## Authentication Flow
 
 ### Login Flow
-1. User submits email/password → `/api/go/login`
-2. If 2FA enabled → User submits OTP → `/api/go/verify-otp`
+1. User submits email/password → `/api/go/auth/login`
+2. If 2FA enabled → User submits OTP → `/api/go/auth/verify-otp`
 3. Token stored in localStorage
 4. User redirected to dashboard
 
 ### Registration Flow
-1. User submits email/password → `/api/go/register`
+1. User submits email/password → `/api/go/auth/register`
 2. QR code displayed for 2FA setup
-3. User submits OTP → `/api/go/complete-registration`
+3. User submits OTP → `/api/go/auth/complete-registration`
 4. Token stored in localStorage
 5. User redirected to dashboard
 
 ### Password Reset Flow
-1. User submits email/new password/OTP → `/api/go/reset-password`
+1. User submits email/new password/OTP → `/api/go/auth/reset-password`
 2. Password updated in database
 3. User redirected to login
 
@@ -415,7 +415,7 @@ The Next.js server starts on port 3000.
 curl http://localhost:8080/api/system-config
 
 # Test via Next.js proxy
-curl http://localhost:3000/api/go/system-config
+curl http://localhost:3000/api/go/auth/system-config
 ```
 
 ## Deployment
@@ -495,21 +495,23 @@ allowedOrigins := []string{
 next/app/api/go/
 ├── README.md                      # This file
 ├── login/
-│   └── route.ts                   # POST /api/go/login
-├── verify-otp/
-│   └── route.ts                   # POST /api/go/verify-otp
-├── register/
-│   └── route.ts                   # POST /api/go/register
-├── complete-registration/
-│   └── route.ts                   # POST /api/go/complete-registration
-├── reset-password/
-│   └── route.ts                   # POST /api/go/reset-password
-├── admin-login/
-│   └── route.ts                   # POST /api/go/admin-login
-├── logout/
-│   └── route.ts                   # POST /api/go/logout
-└── system-config/
-    └── route.ts                   # GET /api/go/system-config
+└── auth/
+    ├── login/
+    │   └── route.ts               # POST /api/go/auth/login
+    ├── verify-otp/
+    │   └── route.ts               # POST /api/go/auth/verify-otp
+    ├── register/
+    │   └── route.ts               # POST /api/go/auth/register
+    ├── complete-registration/
+    │   └── route.ts               # POST /api/go/auth/complete-registration
+    ├── reset-password/
+    │   └── route.ts               # POST /api/go/auth/reset-password
+    ├── admin-login/
+    │   └── route.ts               # POST /api/go/auth/admin-login
+    ├── logout/
+    │   └── route.ts               # POST /api/go/auth/logout
+    └── system-config/
+        └── route.ts               # GET /api/go/auth/system-config
 ```
 
 ## Related Documentation
