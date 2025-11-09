@@ -70,45 +70,61 @@ export default function TraderDetailPage({ params }: TraderDetailProps) {
   const [isOwnTrader, setIsOwnTrader] = useState(false)
 
   console.log('🎯 TraderDetailPage loaded with traderId:', traderId)
+  console.log('🎯 Trader ID length:', traderId?.length)
   console.log('🎯 Full params:', params)
 
   // Smart fetcher that tries authenticated endpoint first, then falls back to public
   const smartFetcher = async (url: string) => {
-    console.log('📡 Smart fetching trader config:', { traderId, hasToken: !!token })
+    console.log('📡 Smart fetching trader config:', { traderId, traderIdLength: traderId?.length, hasToken: !!token })
 
     // If user is logged in, try authenticated endpoint first (via Next.js API route)
     if (token) {
       try {
-        console.log('🔐 Trying authenticated endpoint via Next.js API...')
-        const authResponse = await fetch(`/api/go/trade/trader-config/${traderId}`, {
+        const authUrl = `/api/go/trade/trader-config/${traderId}`
+        console.log('🔐 Trying authenticated endpoint:', authUrl)
+        const authResponse = await fetch(authUrl, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json',
           }
         })
 
+        console.log('📡 Authenticated response status:', authResponse.status)
+
         if (authResponse.ok) {
+          const data = await authResponse.json()
           console.log('✅ Authenticated endpoint success - this is your trader')
           setIsOwnTrader(true)
-          return await authResponse.json()
+          return data
         } else {
-          console.log('⚠️ Authenticated endpoint failed, trying public...')
+          const errorData = await authResponse.json().catch(() => ({}))
+          console.error('❌ Authenticated endpoint failed:', authResponse.status, errorData)
         }
       } catch (err) {
-        console.log('⚠️ Authenticated endpoint error:', err)
+        console.error('❌ Authenticated endpoint error:', err)
       }
     }
 
     // Fall back to public endpoint (directly to Go backend)
-    console.log('📡 Trying public endpoint...')
+    const publicUrl = `${BACKEND_URL}/api/traders/${traderId}/public-config`
+    console.log('📡 Trying public endpoint:', publicUrl)
     setIsOwnTrader(false)
-    const publicResponse = await fetch(`${BACKEND_URL}/api/traders/${traderId}/public-config`)
-    if (!publicResponse.ok) {
-      console.error('❌ Public endpoint also failed')
-      throw new Error('Trader not found')
+
+    try {
+      const publicResponse = await fetch(publicUrl)
+      console.log('📡 Public response status:', publicResponse.status)
+
+      if (!publicResponse.ok) {
+        const errorData = await publicResponse.json().catch(() => ({}))
+        console.error('❌ Public endpoint failed:', publicResponse.status, errorData)
+        throw new Error(`Trader not found (status: ${publicResponse.status})`)
+      }
+      console.log('✅ Public endpoint success')
+      return await publicResponse.json()
+    } catch (err) {
+      console.error('❌ Public endpoint error:', err)
+      throw err
     }
-    console.log('✅ Public endpoint success')
-    return await publicResponse.json()
   }
 
   // Fetch trader config using smart fetcher

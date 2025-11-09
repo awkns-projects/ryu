@@ -57,11 +57,29 @@ export async function POST(request: NextRequest) {
     if (aiModelsResponse.ok) {
       const aiModelsData = await aiModelsResponse.json()
       console.log(`📊 AI models data:`, aiModelsData)
-      // Response is an array directly, not wrapped in an object
-      const aiModelExists = Array.isArray(aiModelsData) && aiModelsData.some((m: any) => m.id === aiModelId)
-      console.log(`🔎 AI model '${aiModelId}' exists:`, aiModelExists)
 
-      if (!aiModelExists) {
+      // Response is an array directly, not wrapped in an object
+      // First check if there's an AI model with this exact ID
+      let existingModel = Array.isArray(aiModelsData)
+        ? aiModelsData.find((m: any) => m.id === aiModelId)
+        : null
+
+      // If not found by exact ID, try to find by provider (e.g., "deepseek")
+      if (!existingModel && aiModelId === 'deepseek') {
+        existingModel = Array.isArray(aiModelsData)
+          ? aiModelsData.find((m: any) => m.provider === 'deepseek')
+          : null
+
+        if (existingModel) {
+          // Use the existing model's actual ID
+          aiModelId = existingModel.id
+          console.log(`✓ Found existing DeepSeek model with ID: ${aiModelId}`)
+        }
+      }
+
+      console.log(`🔎 AI model '${aiModelId}' exists:`, !!existingModel)
+
+      if (!existingModel) {
         console.log(`💡 AI model '${aiModelId}' not found, creating...`)
 
         // Get DeepSeek API key from environment
@@ -86,6 +104,26 @@ export async function POST(request: NextRequest) {
           })
 
           console.log('✅ DeepSeek AI model created successfully')
+
+          // Re-fetch AI models to get the actual ID that was created
+          const refreshedResponse = await fetch(`${BACKEND_URL}/api/models`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader,
+            },
+          })
+
+          if (refreshedResponse.ok) {
+            const refreshedData = await refreshedResponse.json()
+            const createdModel = Array.isArray(refreshedData)
+              ? refreshedData.find((m: any) => m.provider === 'deepseek')
+              : null
+
+            if (createdModel) {
+              aiModelId = createdModel.id
+              console.log(`✅ Using created AI model ID: ${aiModelId}`)
+            }
+          }
         } catch (error) {
           console.error('❌ Failed to create DeepSeek AI model:', error)
           return NextResponse.json(
