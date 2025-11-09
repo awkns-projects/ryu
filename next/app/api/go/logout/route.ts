@@ -6,15 +6,15 @@ export async function POST(request: NextRequest) {
   try {
     // Get authorization header from the request
     const authHeader = request.headers.get('Authorization');
-    
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
-    
+
     if (authHeader) {
       headers['Authorization'] = authHeader;
     }
-    
+
     const response = await fetch(`${GO_API_URL}/api/logout`, {
       method: 'POST',
       headers,

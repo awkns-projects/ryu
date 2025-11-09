@@ -173,7 +173,7 @@ export function PasswordAuthProvider({ children }: { children: ReactNode }) {
         password: string;
         beta_code?: string;
       } = { email, password };
-      
+
       if (betaCode) {
         requestBody.beta_code = betaCode;
       }
@@ -301,7 +301,7 @@ export function PasswordAuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     if (typeof window !== 'undefined') {
       const savedToken = localStorage.getItem('auth_token');
-      
+
       if (savedToken) {
         fetch('/api/go/logout', {
           method: 'POST',
