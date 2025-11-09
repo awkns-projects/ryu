@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useEffect, useRef, useState } from "react"
-import { MeshGradient } from "@paper-design/shaders-react"
 
 interface ShaderBackgroundProps {
   children: React.ReactNode
@@ -12,8 +11,16 @@ interface ShaderBackgroundProps {
 export default function ShaderBackground({ children }: ShaderBackgroundProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [isActive, setIsActive] = useState(false)
+  const [MeshGradientComponent, setMeshGradientComponent] = useState<any>(null)
 
   useEffect(() => {
+    // Dynamically import MeshGradient only on client side
+    import("@paper-design/shaders-react").then((mod) => {
+      setMeshGradientComponent(() => mod.MeshGradient)
+    }).catch((error) => {
+      console.error("Failed to load MeshGradient:", error)
+    })
+
     const handleMouseEnter = () => setIsActive(true)
     const handleMouseLeave = () => setIsActive(false)
 
@@ -62,16 +69,20 @@ export default function ShaderBackground({ children }: ShaderBackgroundProps) {
       </svg>
 
       {/* Background Shaders */}
-      <MeshGradient
-        className="absolute inset-0 w-full h-full"
-        colors={["#000000", "#8b5cf6", "#ffffff", "#1e1b4b", "#4c1d95"]}
-        speed={0.3}
-      />
-      <MeshGradient
-        className="absolute inset-0 w-full h-full opacity-60"
-        colors={["#000000", "#ffffff", "#8b5cf6", "#000000"]}
-        speed={0.2}
-      />
+      {MeshGradientComponent && (
+        <>
+          <MeshGradientComponent
+            className="absolute inset-0 w-full h-full"
+            colors={["#000000", "#8b5cf6", "#ffffff", "#1e1b4b", "#4c1d95"]}
+            speed={0.3}
+          />
+          <MeshGradientComponent
+            className="absolute inset-0 w-full h-full opacity-60"
+            colors={["#000000", "#ffffff", "#8b5cf6", "#000000"]}
+            speed={0.2}
+          />
+        </>
+      )}
 
       {children}
     </div>

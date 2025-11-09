@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import MarketplaceHeader from '@/components/marketplace-header'
+import PulsingCircle from '@/components/shader/pulsing-circle'
 import { Plus, ChevronRight, ChevronLeft, Loader2, TrendingUp, Wallet, Settings, Trash2, Activity, DollarSign, Check, FileText, Bot, ShoppingCart, ArrowUpRight, ArrowDownRight, Target, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Image from 'next/image'
@@ -1486,6 +1487,9 @@ export default function TradePage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* AI Trading Tutor */}
+      <PulsingCircle />
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import { useSession } from "@/lib/auth-client"
 import useSWR from "swr"
 import MarketplaceHeader from '@/components/marketplace-header'
+import PulsingCircle from '@/components/shader/pulsing-circle'
 import { Trophy, Activity, FileText, ChevronRight, Loader2, Star, Users, Target, TrendingUp, DollarSign, BarChart3, PieChart, ChevronLeft, Search, Filter, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 
@@ -1707,6 +1708,9 @@ export default function ExplorerPage() {
           )}
         </div>
       </div>
+
+      {/* AI Trading Tutor */}
+      <PulsingCircle />
     </div>
   )
 }

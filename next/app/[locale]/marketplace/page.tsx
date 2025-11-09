@@ -6,6 +6,7 @@ import { createChart, ColorType, LineStyle, AreaSeries, type Time } from 'lightw
 import Image from 'next/image'
 import { useTranslations, useLocale } from 'next-intl'
 import MarketplaceHeader from '@/components/marketplace-header'
+import PulsingCircle from '@/components/shader/pulsing-circle'
 
 type Agent = {
   id: string
@@ -1102,6 +1103,9 @@ export default function MarketplacePage() {
           }
         }
       `}</style>
+
+      {/* AI Trading Tutor */}
+      <PulsingCircle />
     </div>
   )
 }
