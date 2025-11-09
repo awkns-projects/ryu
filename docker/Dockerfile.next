@@ -1,0 +1,59 @@
+# docker/frontend/Dockerfile
+
+# ═══════════════════════════════════════════════════════════════
+# NOFX Frontend Dockerfile (Node Build → Nginx Runtime)
+# Versions extracted as ARGs for consistency
+# ═══════════════════════════════════════════════════════════════
+
+ARG NODE_VERSION=20-alpine
+ARG NGINX_VERSION=alpine
+
+# ──────────────────────────────────────────────────────────────
+# Build Stage (Node)
+# ──────────────────────────────────────────────────────────────
+FROM node:${NODE_VERSION} AS builder
+
+# Install Python and build tools for native modules (e.g., bufferutil)
+RUN apk update && apk add --no-cache python3 make g++
+
+WORKDIR /build
+
+# Copy package files and Prisma schema before npm ci
+# This ensures the postinstall script can run prisma generate successfully
+COPY next/package*.json ./
+COPY next/prisma ./prisma/
+
+# Install dependencies (postinstall will run prisma generate)
+RUN npm ci
+
+# Copy the rest of the source code
+COPY next/ ./
+
+# Build the application
+RUN npm run build
+
+# ──────────────────────────────────────────────────────────────
+# Runtime Stage (Node)
+# ──────────────────────────────────────────────────────────────
+FROM node:${NODE_VERSION}
+
+WORKDIR /app
+
+# Copy built application from builder
+COPY --from=builder /build/.next ./.next
+COPY --from=builder /build/node_modules ./node_modules
+COPY --from=builder /build/package*.json ./
+COPY --from=builder /build/prisma ./prisma
+COPY --from=builder /build/public ./public
+COPY --from=builder /build/next.config.ts ./
+
+# Set NODE_ENV to production
+ENV NODE_ENV=production
+ENV PORT=3000
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3000 || exit 1
+
+CMD ["npm", "start"]

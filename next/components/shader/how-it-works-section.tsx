@@ -1,9 +1,11 @@
 "use client"
 
-import { useTranslations } from 'next-intl'
+import { useTranslations, useLocale } from 'next-intl'
+import Link from 'next/link'
 
 export default function HowItWorksSection() {
   const t = useTranslations('howItWorksSection')
+  const locale = useLocale()
 
   return (
     <section id="how-it-works" className="relative z-20 px-8 py-16 max-w-6xl mx-auto">
@@ -191,9 +193,9 @@ export default function HowItWorksSection() {
 
       {/* CTA Below Steps */}
       <div className="text-center mt-12">
-        <button className="px-10 py-4 rounded-full bg-white text-black font-medium text-sm transition-all duration-200 hover:bg-white/90 hover:scale-105 cursor-pointer">
+        <Link href={`/${locale}/trade`} className="inline-block px-10 py-4 rounded-full bg-white text-black font-medium text-sm transition-all duration-200 hover:bg-white/90 hover:scale-105 cursor-pointer">
           {t('cta')} →
-        </button>
+        </Link>
       </div>
     </section>
   )

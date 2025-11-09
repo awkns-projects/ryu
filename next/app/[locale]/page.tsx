@@ -1,56 +1,27 @@
-import { Hero } from "@/components/hero"
-import { HowItWorks } from "@/components/how-it-works"
-import { UseCases } from "@/components/use-cases"
-import { FeaturesTabs } from "@/components/features-tabs"
-import { TemplateGallery } from "@/components/template-gallery"
-import { Comparison } from "@/components/comparison"
-import { Pricing } from "@/components/pricing"
-import { FinalCTA } from "@/components/final-cta"
-import { Header } from "@/components/header"
-import { AICapabilities } from "@/components/ai-capabilities"
+"use client"
 
-export default function Page() {
+import ShaderBackground from "@/components/shader/shader-background"
+import ShaderHeader from "@/components/shader/shader-header"
+import HeroContent from "@/components/shader/hero-content"
+import PulsingCircle from "@/components/shader/pulsing-circle"
+import HowItWorksSection from "@/components/shader/how-it-works-section"
+import MarketplaceSection from "@/components/shader/marketplace-section"
+
+export default function TestPage() {
   return (
-    <div className="min-h-screen bg-background">
-      <Header />
-      <main>
-        {/* 1. Hero: The Hook - Problem + Solution */}
-        <Hero />
-
-        {/* 2. Get Started Fast - Templates (Show what you can build!) */}
-        <section id="templates">
-          <TemplateGallery />
-        </section>
-
-        {/* 3. Features Tabs - All-in-one interface and capabilities */}
-        <section id="features">
-          <AICapabilities />
-          <FeaturesTabs />
-        </section>
-
-        {/* 4. How It Works - The process behind the magic */}
-        <section id="how-it-works">
-          <HowItWorks />
-        </section>
-
-        {/* 5. See It In Action - Real use cases with AI reasoning */}
-        <section id="use-cases">
-          <UseCases />
-        </section>
-
-        {/* 6. Why Choose Us - Comparison */}
-        <section id="comparison">
-          <Comparison />
-        </section>
-
-        {/* 7. Pricing */}
-        <section id="pricing">
-          <Pricing />
-        </section>
-
-        {/* 8. Final CTA */}
-        <FinalCTA />
-      </main>
+    <div className="relative">
+      <ShaderBackground>
+        <ShaderHeader />
+        <HeroContent />
+        <PulsingCircle />
+      </ShaderBackground>
+      <div className="relative bg-gradient-to-b from-transparent via-black/50 to-black pt-20">
+        <HowItWorksSection />
+      </div>
+      <div className="relative bg-gradient-to-b from-black via-black/80 to-black/50 pb-20">
+        <MarketplaceSection />
+      </div>
     </div>
   )
 }
+
