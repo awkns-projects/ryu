@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { generateEthereumWallet } from '@/lib/wallet'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
@@ -33,18 +34,133 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse request body
-    const body = await request.json()
+    const body: CreateTraderRequest = await request.json()
 
-    console.log('🔄 [API Route] Creating trader on Go backend...', body.name)
+    console.log('🔄 [API Route] Creating trader...', body.name)
+
+    // ====================================
+    // 🔐 STEP 1: Auto-create DeepSeek AI Model if needed
+    // ====================================
+    let aiModelId = body.ai_model_id || 'deepseek'
+    console.log(`🔍 Checking if AI model '${aiModelId}' exists...`)
+
+    // Check if AI model exists (use /api/models endpoint)
+    const aiModelsResponse = await fetch(`${BACKEND_URL}/api/models`, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': authHeader,
+      },
+    })
+
+    console.log(`📡 AI models fetch status: ${aiModelsResponse.status}`)
+
+    if (aiModelsResponse.ok) {
+      const aiModelsData = await aiModelsResponse.json()
+      console.log(`📊 AI models data:`, aiModelsData)
+      // Response is an array directly, not wrapped in an object
+      const aiModelExists = Array.isArray(aiModelsData) && aiModelsData.some((m: any) => m.id === aiModelId)
+      console.log(`🔎 AI model '${aiModelId}' exists:`, aiModelExists)
+
+      if (!aiModelExists) {
+        console.log(`💡 AI model '${aiModelId}' not found, creating...`)
+
+        // Get DeepSeek API key from environment
+        const deepseekApiKey = process.env.DEEPSEEK_API_KEY
+
+        if (!deepseekApiKey) {
+          return NextResponse.json(
+            { error: 'DEEPSEEK_API_KEY environment variable is not set. Please configure it first.' },
+            { status: 400 }
+          )
+        }
+
+        // Create DeepSeek AI model using updateAIModelConfig
+        try {
+          const { updateAIModelConfig } = await import('@/lib/go-crypto')
+
+          await updateAIModelConfig(authHeader, aiModelId, {
+            enabled: true,
+            api_key: deepseekApiKey,
+            custom_api_url: '',
+            custom_model_name: '',
+          })
+
+          console.log('✅ DeepSeek AI model created successfully')
+        } catch (error) {
+          console.error('❌ Failed to create DeepSeek AI model:', error)
+          return NextResponse.json(
+            { error: `Failed to create DeepSeek AI model: ${error instanceof Error ? error.message : 'Unknown error'}` },
+            { status: 500 }
+          )
+        }
+      } else {
+        console.log(`✓ AI model '${aiModelId}' already exists`)
+      }
+    }
+
+    // ====================================
+    // 🔐 STEP 2: Auto-generate NEW Hyperliquid wallet for EACH trader
+    // ====================================
+    let walletAddress = ''
+    let isNewWallet = false
+    let uniqueExchangeId = body.exchange_id // Default to the original exchange_id
+
+    if (body.exchange_id === 'hyperliquid') {
+      console.log('🔑 Hyperliquid exchange detected, generating NEW wallet for this trader...')
+
+      // ALWAYS generate a new wallet for each trader
+      const wallet = generateEthereumWallet()
+      console.log('✅ New wallet generated for trader:', wallet.address)
+
+      walletAddress = wallet.address
+      isNewWallet = true
+
+      // Create a unique exchange ID for this trader (hyperliquid_<timestamp>)
+      const timestamp = Math.floor(Date.now() / 1000)
+      uniqueExchangeId = `hyperliquid_${timestamp}`
+      console.log(`🆔 Creating new exchange entry with ID: ${uniqueExchangeId}`)
+
+      // Create NEW Hyperliquid exchange config with unique ID
+      try {
+        const { updateExchangeConfig } = await import('@/lib/go-crypto')
+
+        await updateExchangeConfig(authHeader, uniqueExchangeId, {
+          enabled: true,
+          api_key: wallet.privateKey,
+          secret_key: '',
+          testnet: false,
+          hyperliquid_wallet_addr: wallet.address,
+        })
+
+        console.log(`✅ New Hyperliquid exchange created: ${uniqueExchangeId}`)
+        console.log(`💰 Wallet address: ${wallet.address}`)
+        console.log(`💰 IMPORTANT: Please fund wallet ${wallet.address} with USDC to start trading`)
+      } catch (error) {
+        console.error('❌ Failed to create Hyperliquid exchange:', error)
+        return NextResponse.json(
+          { error: `Failed to create Hyperliquid exchange: ${error instanceof Error ? error.message : 'Unknown error'}` },
+          { status: 500 }
+        )
+      }
+    }
+
+    // ====================================
+    // 🔐 STEP 3: Create trader in Go backend
+    // ====================================
+    console.log('🔄 Creating trader in Go backend...')
 
     // Forward request to Go backend
     const response = await fetch(`${BACKEND_URL}/api/traders`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': authHeader, // Forward JWT token to Go backend
+        'Authorization': authHeader,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({
+        ...body,
+        ai_model_id: aiModelId, // Ensure we use the correct AI model ID
+        exchange_id: uniqueExchangeId, // Use the unique exchange ID if generated
+      }),
     })
 
     // Handle authentication errors
@@ -72,6 +188,9 @@ export async function POST(request: NextRequest) {
       success: true,
       trader: data,
       message: 'Trader created successfully',
+      walletAddress: walletAddress || undefined,
+      isNewWallet: isNewWallet,
+      needsDeposit: body.exchange_id === 'hyperliquid' && !!walletAddress, // Show deposit modal for all Hyperliquid traders with wallet
     })
 
   } catch (error) {

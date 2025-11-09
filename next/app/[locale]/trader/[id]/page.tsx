@@ -1,8 +1,9 @@
 "use client"
 
-import { use } from "react"
+import { use, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { useLocale } from "next-intl"
+import { useGoAuth } from "@/contexts/go-auth-context"
 import useSWR from "swr"
 import { ArrowLeft, Activity, TrendingUp, Target, DollarSign, Loader2, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -50,16 +51,74 @@ const fetcher = (url: string) => fetch(url).then(res => {
   return res.json()
 })
 
+const authenticatedFetcher = (url: string, token: string) =>
+  fetch(url, {
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    }
+  }).then(res => {
+    if (!res.ok) throw new Error('Failed to fetch')
+    return res.json()
+  })
+
 export default function TraderDetailPage({ params }: TraderDetailProps) {
   const { id: traderId } = use(params)
   const router = useRouter()
   const locale = useLocale()
+  const { user, token } = useGoAuth()
+  const [isOwnTrader, setIsOwnTrader] = useState(false)
 
-  // Fetch trader config from backend
+  console.log('🎯 TraderDetailPage loaded with traderId:', traderId)
+  console.log('🎯 Full params:', params)
+
+  // Smart fetcher that tries authenticated endpoint first, then falls back to public
+  const smartFetcher = async (url: string) => {
+    console.log('📡 Smart fetching trader config:', { traderId, hasToken: !!token })
+
+    // If user is logged in, try authenticated endpoint first (via Next.js API route)
+    if (token) {
+      try {
+        console.log('🔐 Trying authenticated endpoint via Next.js API...')
+        const authResponse = await fetch(`/api/go/trade/trader-config/${traderId}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          }
+        })
+
+        if (authResponse.ok) {
+          console.log('✅ Authenticated endpoint success - this is your trader')
+          setIsOwnTrader(true)
+          return await authResponse.json()
+        } else {
+          console.log('⚠️ Authenticated endpoint failed, trying public...')
+        }
+      } catch (err) {
+        console.log('⚠️ Authenticated endpoint error:', err)
+      }
+    }
+
+    // Fall back to public endpoint (directly to Go backend)
+    console.log('📡 Trying public endpoint...')
+    setIsOwnTrader(false)
+    const publicResponse = await fetch(`${BACKEND_URL}/api/traders/${traderId}/public-config`)
+    if (!publicResponse.ok) {
+      console.error('❌ Public endpoint also failed')
+      throw new Error('Trader not found')
+    }
+    console.log('✅ Public endpoint success')
+    return await publicResponse.json()
+  }
+
+  // Fetch trader config using smart fetcher
   const { data: traderConfig, error: configError, isLoading: loadingConfig } = useSWR<TraderConfig>(
-    `${BACKEND_URL}/api/traders/${traderId}/public-config`,
-    fetcher,
-    { refreshInterval: 30000 }
+    `trader-${traderId}`, // Simple key that doesn't change
+    () => smartFetcher(traderId),
+    {
+      refreshInterval: 30000,
+      revalidateOnFocus: false,
+    }
   )
 
   // Fetch trader data from competition endpoint (public data)
@@ -139,11 +198,11 @@ export default function TraderDetailPage({ params }: TraderDetailProps) {
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Back Button */}
         <button
-          onClick={() => router.push(`/${locale}/explorer`)}
+          onClick={() => router.push(isOwnTrader ? `/${locale}/trade` : `/${locale}/explorer`)}
           className="mb-6 px-4 py-2 rounded-lg bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-white/70 hover:text-white transition-all inline-flex items-center gap-2 text-sm"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back to Explorer
+          {isOwnTrader ? 'Back to My Traders' : 'Back to Explorer'}
         </button>
 
         {/* Header */}
@@ -298,7 +357,10 @@ export default function TraderDetailPage({ params }: TraderDetailProps) {
         {/* Note */}
         <div className="mt-6 p-4 rounded-lg bg-blue-500/10 border border-blue-500/20 text-center">
           <p className="text-sm text-blue-400">
-            📊 This trader is publicly visible on the Explorer. Live performance updates every 15 seconds.
+            {isOwnTrader
+              ? '📊 This is your trader. Live performance updates every 15 seconds.'
+              : '📊 This trader is publicly visible on the Explorer. Live performance updates every 15 seconds.'
+            }
           </p>
         </div>
       </div>
