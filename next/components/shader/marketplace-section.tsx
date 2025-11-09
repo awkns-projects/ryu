@@ -93,7 +93,7 @@ export default function MarketplaceSection() {
       price: 99,
       rating: 4.9,
       users: 2341,
-      icon: "₿",
+      icon: "/svg/color/btc.svg",
       entryPrice: "$43,250",
       liquidation: "$38,925",
       leverage: "10x",
@@ -117,7 +117,7 @@ export default function MarketplaceSection() {
       price: 89,
       rating: 4.7,
       users: 1567,
-      icon: "⟠",
+      icon: "/svg/color/eth.svg",
       entryPrice: "$2,380",
       liquidation: "$2,856",
       leverage: "5x",
@@ -161,7 +161,7 @@ export default function MarketplaceSection() {
       price: 109,
       rating: 4.6,
       users: 1234,
-      icon: "⬡",
+      icon: "/svg/color/poly.svg",
       entryPrice: "$0.852",
       liquidation: "$0.795",
       leverage: "15x",
@@ -403,14 +403,14 @@ export default function MarketplaceSection() {
                   <div className="relative z-10">
                     {/* Icon */}
                     <div className="mb-5">
-                      {item.icon.includes('.png') ? (
-                        <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-black/10 to-black/5 backdrop-blur-sm flex items-center justify-center border border-black/10 group-hover:scale-110 transition-transform duration-300">
+                      {item.icon.includes('.png') || item.icon.includes('.svg') ? (
+                        <div className={`w-14 h-14 ${item.icon.includes('.png') ? 'rounded-full' : 'rounded-xl'} overflow-hidden bg-gradient-to-br from-black/10 to-black/5 backdrop-blur-sm flex items-center justify-center border border-black/10 group-hover:scale-110 transition-transform duration-300`}>
                           <Image
                             src={item.icon}
                             alt={item.name}
                             width={56}
                             height={56}
-                            className="w-full h-full object-cover"
+                            className={`${item.icon.includes('.svg') ? 'w-10 h-10' : 'w-full h-full'} object-cover`}
                           />
                         </div>
                       ) : (
