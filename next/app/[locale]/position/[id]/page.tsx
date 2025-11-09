@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { createChart, ColorType, LineStyle, AreaSeries, type Time } from 'lightweight-charts'
 import Image from 'next/image'
 import { useTranslations, useLocale } from 'next-intl'
-import MarketplaceHeader from '@/components/marketplace-header'
+import AppHeader from '@/components/app-header'
 import CardShaderBackground from '@/components/shader/card-shader-background'
 
 type Position = {
@@ -646,7 +646,7 @@ export default function PositionPage() {
     return (
       <div className="min-h-screen bg-black">
         {/* Header */}
-        <MarketplaceHeader locale={locale} activeTab="marketplace" />
+        <AppHeader locale={locale} activeTab="marketplace" />
 
         <div className="flex items-center justify-center" style={{ minHeight: "calc(100vh - 73px)" }}>
           <div className="text-center">
@@ -669,7 +669,7 @@ export default function PositionPage() {
       {/* Sticky Header */}
       <div className={`sticky top-0 z-50 bg-black/95 backdrop-blur-xl transition-all duration-700 delay-100 ${isPageLoaded ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'
         }`}>
-        <MarketplaceHeader locale={locale} activeTab="marketplace" />
+        <AppHeader locale={locale} activeTab="marketplace" />
 
         {/* Mobile Sticky Buying Section - Shows when scrolled */}
         <div className={`lg:hidden border-b border-white/[0.08] transition-all duration-300 overflow-hidden ${showMinimized ? 'max-h-[80px] opacity-100' : 'max-h-0 opacity-0'

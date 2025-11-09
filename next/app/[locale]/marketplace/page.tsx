@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { createChart, ColorType, LineStyle, AreaSeries, type Time } from 'lightweight-charts'
 import Image from 'next/image'
 import { useTranslations, useLocale } from 'next-intl'
-import MarketplaceHeader from '@/components/marketplace-header'
+import AppHeader from '@/components/app-header'
 import PulsingCircle from '@/components/shader/pulsing-circle'
 
 type Agent = {
@@ -156,13 +156,13 @@ export default function MarketplacePage() {
       setIsLoadingAgents(true)
       try {
         const response = await fetch('/api/go/prompt-templates')
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch prompt templates')
         }
-        
+
         const data = await response.json()
-        
+
         // Map template names to agent images (0-9)
         const templateImageMap: Record<string, number> = {
           'default': 0,
@@ -170,7 +170,7 @@ export default function MarketplacePage() {
           'taro_long_prompts': 2,
           'Hansen': 3,
         }
-        
+
         // Map pricing based on template complexity (you can adjust these)
         const templatePriceMap: Record<string, number> = {
           'default': 99,
@@ -178,7 +178,7 @@ export default function MarketplacePage() {
           'taro_long_prompts': 199,
           'Hansen': 249,
         }
-        
+
         // Map tags based on template
         const templateTagsMap: Record<string, string[]> = {
           'default': ['Balanced', 'All Markets', 'Beginner-Friendly'],
@@ -186,11 +186,11 @@ export default function MarketplacePage() {
           'taro_long_prompts': ['Long-term', 'Risk Management', 'AI'],
           'Hansen': ['Swing Trading', 'Multi-timeframe', 'Expert'],
         }
-        
+
         // Transform templates to agents with CONSISTENT values
         const dynamicAgents: Agent[] = data.templates?.map((t: { name: string }, index: number) => ({
           id: t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-          name: t.name.split('_').map((word: string) => 
+          name: t.name.split('_').map((word: string) =>
             word.charAt(0).toUpperCase() + word.slice(1)
           ).join(' '),
           description: `Advanced AI trading strategy powered by ${t.name} prompt template with optimized risk management`,
@@ -201,7 +201,7 @@ export default function MarketplacePage() {
           category: 'Trading Bot',
           tags: templateTagsMap[t.name] || ['AI Trading', 'Automated', 'Smart'],
         })) || []
-        
+
         // Combine dynamic and static agents
         const allAgents = [...dynamicAgents, ...STATIC_AGENTS]
         setAgents(allAgents)
@@ -215,7 +215,7 @@ export default function MarketplacePage() {
         setIsLoadingAgents(false)
       }
     }
-    
+
     fetchAgents()
   }, [])
 
@@ -503,7 +503,7 @@ export default function MarketplacePage() {
     <div className={`min-h-screen bg-black pb-20 md:pb-0 transition-all duration-700 ${isPageLoaded && !isNavigating ? 'opacity-100' : 'opacity-0'
       }`}>
       {/* Sticky Header */}
-      <MarketplaceHeader locale={locale} activeTab="marketplace" />
+      <AppHeader locale={locale} activeTab="marketplace" />
 
       {/* Main Content */}
       <div className={`max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 transition-all duration-700 delay-200 ${isPageLoaded ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'
@@ -701,130 +701,130 @@ export default function MarketplacePage() {
                 : "space-y-3 md:space-y-4"
                 } transition-all duration-300 ${isTabSwitching || isNavigating ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
                 {filteredItems.map((item, index) => {
-              const isPosition = 'entryPrice' in item
-              const position = item as Position
-              const href = isPosition ? `/${locale}/position/${item.id}` : `/${locale}/marketplace/agent/${item.id}`
+                  const isPosition = 'entryPrice' in item
+                  const position = item as Position
+                  const href = isPosition ? `/${locale}/position/${item.id}` : `/${locale}/marketplace/agent/${item.id}`
 
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => handleItemClick(href)}
-                  className={`group block rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-500 hover:-translate-y-0.5 active:scale-95 cursor-pointer overflow-hidden relative ${viewMode === "list" ? "p-4" : "p-4"
-                    }`}
-                  style={{
-                    animation: itemsAnimated ? `fadeInUp 0.6s ease-out forwards ${index * 0.08}s` : 'none',
-                    opacity: itemsAnimated ? 1 : 0
-                  }}
-                >
-                  {/* Shimmer effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.02] to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+                  return (
+                    <div
+                      key={item.id}
+                      onClick={() => handleItemClick(href)}
+                      className={`group block rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-500 hover:-translate-y-0.5 active:scale-95 cursor-pointer overflow-hidden relative ${viewMode === "list" ? "p-4" : "p-4"
+                        }`}
+                      style={{
+                        animation: itemsAnimated ? `fadeInUp 0.6s ease-out forwards ${index * 0.08}s` : 'none',
+                        opacity: itemsAnimated ? 1 : 0
+                      }}
+                    >
+                      {/* Shimmer effect */}
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.02] to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
 
-                  <div className={`relative z-10 ${viewMode === "list" ? "flex items-center gap-4" : ""}`}>
-                    {/* Icon */}
-                    <div className={viewMode === "list" ? "flex-shrink-0" : "mb-3"}>
-                      {item.icon.includes('.png') ? (
-                        <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-white/[0.05] to-white/[0.02] backdrop-blur-sm flex items-center justify-center border border-white/[0.08] group-hover:scale-110 transition-transform duration-300">
-                          <Image
-                            src={item.icon}
-                            alt={item.name}
-                            width={48}
-                            height={48}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      ) : (
-                        <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-white/[0.05] to-white/[0.02] backdrop-blur-sm flex items-center justify-center border border-white/[0.08] text-3xl group-hover:scale-110 transition-transform duration-300">
-                          {item.icon}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1">
-                      {/* Title and badges */}
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <h3 className="text-sm font-semibold text-white mb-1.5">{item.name}</h3>
-                          <div className="flex items-center gap-1.5">
-                            {isPosition && (
-                              <>
-                                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${position.type === 'Long'
-                                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                                  }`}>
-                                  {position.leverage} {position.type}
-                                </span>
-                                {position.saleType === "auction" && (
-                                  <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-400 border border-purple-500/30">
-                                    🔨 Auction
-                                  </span>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-0.5 text-yellow-400">
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                          </svg>
-                          <span className="text-xs font-semibold text-white">{item.rating}</span>
-                        </div>
-                      </div>
-
-                      {/* Description */}
-                      <p className="text-xs text-white/50 mb-3 line-clamp-2">{item.description}</p>
-
-                      {/* Position Chart or Agent Tags */}
-                      {isPosition ? (
-                        <div className="mb-3">
-                          {viewMode === "grid" && (
-                            <div className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-1.5 mb-2">
-                              <PNLChart position={position} />
+                      <div className={`relative z-10 ${viewMode === "list" ? "flex items-center gap-4" : ""}`}>
+                        {/* Icon */}
+                        <div className={viewMode === "list" ? "flex-shrink-0" : "mb-3"}>
+                          {item.icon.includes('.png') ? (
+                            <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-br from-white/[0.05] to-white/[0.02] backdrop-blur-sm flex items-center justify-center border border-white/[0.08] group-hover:scale-110 transition-transform duration-300">
+                              <Image
+                                src={item.icon}
+                                alt={item.name}
+                                width={48}
+                                height={48}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-white/[0.05] to-white/[0.02] backdrop-blur-sm flex items-center justify-center border border-white/[0.08] text-3xl group-hover:scale-110 transition-transform duration-300">
+                              {item.icon}
                             </div>
                           )}
-                          <div className={`text-lg font-bold tabular-nums ${position.priceChange.startsWith('+') ? 'text-green-400' : 'text-red-400'
-                            }`}>
-                            {position.priceChange}
-                          </div>
-                          <div className="text-[10px] text-white/40 mt-0.5">{t('currentPNL')}</div>
                         </div>
-                      ) : (
-                        <div className="flex flex-wrap gap-1.5 mb-3">
-                          {(item as Agent).tags.map(tag => (
-                            <span key={tag} className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/[0.05] text-white/60 border border-white/[0.08]">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      )}
 
-                      {/* Footer: Price and Users */}
-                      <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
-                        <div>
-                          {isPosition && position.saleType === "auction" ? (
-                            <>
-                              <div className="text-[10px] text-white/40 mb-0.5 uppercase tracking-wider font-semibold">{t('currentBid')}</div>
-                              <div className="text-base font-bold text-white tabular-nums">${position.currentBid}</div>
-                            </>
+                        {/* Content */}
+                        <div className="flex-1">
+                          {/* Title and badges */}
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <h3 className="text-sm font-semibold text-white mb-1.5">{item.name}</h3>
+                              <div className="flex items-center gap-1.5">
+                                {isPosition && (
+                                  <>
+                                    <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${position.type === 'Long'
+                                      ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                                      : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                                      }`}>
+                                      {position.leverage} {position.type}
+                                    </span>
+                                    {position.saleType === "auction" && (
+                                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-purple-500/20 to-blue-500/20 text-purple-400 border border-purple-500/30">
+                                        🔨 Auction
+                                      </span>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-0.5 text-yellow-400">
+                              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                              </svg>
+                              <span className="text-xs font-semibold text-white">{item.rating}</span>
+                            </div>
+                          </div>
+
+                          {/* Description */}
+                          <p className="text-xs text-white/50 mb-3 line-clamp-2">{item.description}</p>
+
+                          {/* Position Chart or Agent Tags */}
+                          {isPosition ? (
+                            <div className="mb-3">
+                              {viewMode === "grid" && (
+                                <div className="rounded-lg bg-white/[0.02] border border-white/[0.06] p-1.5 mb-2">
+                                  <PNLChart position={position} />
+                                </div>
+                              )}
+                              <div className={`text-lg font-bold tabular-nums ${position.priceChange.startsWith('+') ? 'text-green-400' : 'text-red-400'
+                                }`}>
+                                {position.priceChange}
+                              </div>
+                              <div className="text-[10px] text-white/40 mt-0.5">{t('currentPNL')}</div>
+                            </div>
                           ) : (
-                            <>
-                              <div className="text-[10px] text-white/40 mb-0.5 uppercase tracking-wider font-semibold">Price</div>
-                              <div className="text-base font-bold text-white tabular-nums">${item.price}</div>
-                            </>
+                            <div className="flex flex-wrap gap-1.5 mb-3">
+                              {(item as Agent).tags.map(tag => (
+                                <span key={tag} className="px-1.5 py-0.5 rounded-full text-[10px] bg-white/[0.05] text-white/60 border border-white/[0.08]">
+                                  {tag}
+                                </span>
+                              ))}
+                            </div>
                           )}
-                        </div>
-                        <div className="flex items-center gap-1 text-white/50">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                          <span className="text-xs tabular-nums">{item.users.toLocaleString()}</span>
+
+                          {/* Footer: Price and Users */}
+                          <div className="flex items-center justify-between pt-3 border-t border-white/[0.06]">
+                            <div>
+                              {isPosition && position.saleType === "auction" ? (
+                                <>
+                                  <div className="text-[10px] text-white/40 mb-0.5 uppercase tracking-wider font-semibold">{t('currentBid')}</div>
+                                  <div className="text-base font-bold text-white tabular-nums">${position.currentBid}</div>
+                                </>
+                              ) : (
+                                <>
+                                  <div className="text-[10px] text-white/40 mb-0.5 uppercase tracking-wider font-semibold">Price</div>
+                                  <div className="text-base font-bold text-white tabular-nums">${item.price}</div>
+                                </>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 text-white/50">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                              </svg>
+                              <span className="text-xs tabular-nums">{item.users.toLocaleString()}</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              )
-            })}
+                  )
+                })}
               </div>
 
               {/* Empty State */}

@@ -7,6 +7,7 @@ import { useGoAuth } from "@/contexts/go-auth-context"
 import useSWR from "swr"
 import { ArrowLeft, Activity, TrendingUp, Target, DollarSign, Loader2, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
+import AppHeader from '@/components/app-header'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
@@ -154,10 +155,13 @@ export default function TraderDetailPage({ params }: TraderDetailProps) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-8 h-8 animate-spin text-white/60" />
-          <p className="text-white/60">Loading trader details...</p>
+      <div className="min-h-screen bg-black">
+        <AppHeader locale={locale} activeTab={isOwnTrader ? "trade" : "explorer"} />
+        <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 80px)' }}>
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="w-8 h-8 animate-spin text-white/60" />
+            <p className="text-white/60">Loading trader details...</p>
+          </div>
         </div>
       </div>
     )
@@ -165,23 +169,26 @@ export default function TraderDetailPage({ params }: TraderDetailProps) {
 
   if (configError || !traderConfig) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="max-w-md w-full mx-auto px-6">
-          <div className="rounded-xl border border-white/[0.08] bg-black/60 backdrop-blur-xl p-8 text-center">
-            <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
-              <Activity className="w-8 h-8 text-red-400" />
+      <div className="min-h-screen bg-black">
+        <AppHeader locale={locale} activeTab="explorer" />
+        <div className="flex items-center justify-center" style={{ minHeight: 'calc(100vh - 80px)' }}>
+          <div className="max-w-md w-full mx-auto px-6">
+            <div className="rounded-xl border border-white/[0.08] bg-black/60 backdrop-blur-xl p-8 text-center">
+              <div className="w-16 h-16 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center mx-auto mb-4">
+                <Activity className="w-8 h-8 text-red-400" />
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-2">Trader Not Found</h2>
+              <p className="text-sm text-white/60 mb-6">
+                The trader you're looking for doesn't exist or is no longer available.
+              </p>
+              <button
+                onClick={() => router.push(`/${locale}/explorer`)}
+                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors inline-flex items-center gap-2"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back to Explorer
+              </button>
             </div>
-            <h2 className="text-xl font-semibold text-white mb-2">Trader Not Found</h2>
-            <p className="text-sm text-white/60 mb-6">
-              The trader you're looking for doesn't exist or is no longer available.
-            </p>
-            <button
-              onClick={() => router.push(`/${locale}/explorer`)}
-              className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors inline-flex items-center gap-2"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Explorer
-            </button>
           </div>
         </div>
       </div>
@@ -210,7 +217,10 @@ export default function TraderDetailPage({ params }: TraderDetailProps) {
   }
 
   return (
-    <div className="min-h-screen bg-black">
+    <div className="min-h-screen bg-black pb-20 md:pb-0">
+      {/* Sticky Header */}
+      <AppHeader locale={locale} activeTab={isOwnTrader ? "trade" : "explorer"} />
+
       <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
         {/* Back Button */}
         <button

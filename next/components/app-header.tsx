@@ -7,12 +7,12 @@ import { LanguageSwitcher } from "./language-switcher"
 import { PointsBadge } from "./points-badge"
 import { useState, useEffect } from "react"
 
-type MarketplaceHeaderProps = {
+type AppHeaderProps = {
   locale: string
   activeTab?: "home" | "trade" | "marketplace" | "explorer"
 }
 
-export default function MarketplaceHeader({ locale, activeTab = "marketplace" }: MarketplaceHeaderProps) {
+export default function AppHeader({ locale, activeTab = "marketplace" }: AppHeaderProps) {
   const router = useRouter()
   const currentLocale = useLocale()
   const t = useTranslations('marketplaceHeader')

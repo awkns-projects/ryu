@@ -5,7 +5,7 @@ import { useTranslations, useLocale } from "next-intl"
 import { useRouter } from "next/navigation"
 import { useSession } from "@/lib/auth-client"
 import useSWR from "swr"
-import MarketplaceHeader from '@/components/marketplace-header'
+import AppHeader from '@/components/app-header'
 import PulsingCircle from '@/components/shader/pulsing-circle'
 import { Trophy, Activity, FileText, ChevronRight, Loader2, Star, Users, Target, TrendingUp, DollarSign, BarChart3, PieChart, ChevronLeft, Search, Filter, X } from "lucide-react"
 import { cn } from "@/lib/utils"
@@ -225,7 +225,7 @@ export default function ExplorerPage() {
         // Transform templates to Template interface
         const transformedTemplates: Template[] = data.templates?.map((template: { name: string }) => {
           const slugId = template.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')
-          const title = template.name.split('_').map((word: string) => 
+          const title = template.name.split('_').map((word: string) =>
             word.charAt(0).toUpperCase() + word.slice(1)
           ).join(' ')
 
@@ -562,7 +562,7 @@ export default function ExplorerPage() {
   return (
     <div className={`min-h-screen bg-black pb-20 md:pb-0 transition-all duration-700 ${isPageLoaded ? 'opacity-100' : 'opacity-0'}`}>
       {/* Sticky Header */}
-      <MarketplaceHeader locale={locale} activeTab="explorer" />
+      <AppHeader locale={locale} activeTab="explorer" />
 
       {/* Main Content */}
       <div className={`max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8 transition-all duration-700 delay-200 ${isPageLoaded ? 'translate-y-0 opacity-100' : 'translate-y-8 opacity-0'}`}>

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import Image from 'next/image'
 import { useTranslations, useLocale } from 'next-intl'
-import MarketplaceHeader from '@/components/marketplace-header'
+import AppHeader from '@/components/app-header'
 
 type Agent = {
   id: string
@@ -398,7 +398,7 @@ export default function MarketplaceAgentPage() {
   useEffect(() => {
     const fetchAgent = async () => {
       setIsLoading(true)
-      
+
       // First, check if it's a static agent
       if (STATIC_AGENTS[agentId]) {
         setAgent(STATIC_AGENTS[agentId])
@@ -409,13 +409,13 @@ export default function MarketplaceAgentPage() {
       // Otherwise, try to fetch from Go API templates
       try {
         const response = await fetch('/api/go/prompt-templates')
-        
+
         if (!response.ok) {
           throw new Error('Failed to fetch templates')
         }
-        
+
         const data = await response.json()
-        
+
         // Map template names to agent images (0-9)
         const templateImageMap: Record<string, number> = {
           'default': 0,
@@ -423,14 +423,14 @@ export default function MarketplaceAgentPage() {
           'taro_long_prompts': 2,
           'Hansen': 3,
         }
-        
+
         const templatePriceMap: Record<string, number> = {
           'default': 99,
           'nof1': 149,
           'taro_long_prompts': 199,
           'Hansen': 249,
         }
-        
+
         const templateTagsMap: Record<string, string[]> = {
           'default': ['Balanced', 'All Markets', 'Beginner-Friendly'],
           'nof1': ['Advanced', 'High-Frequency', 'ML'],
@@ -439,7 +439,7 @@ export default function MarketplaceAgentPage() {
         }
 
         // Find matching template
-        const template = data.templates?.find((t: { name: string }) => 
+        const template = data.templates?.find((t: { name: string }) =>
           t.name.toLowerCase().replace(/[^a-z0-9]+/g, '-') === agentId
         )
 
@@ -456,7 +456,7 @@ export default function MarketplaceAgentPage() {
         // Generate agent from template with CONSISTENT values
         const baseAgent = {
           id: agentId,
-          name: template.name.split('_').map((word: string) => 
+          name: template.name.split('_').map((word: string) =>
             word.charAt(0).toUpperCase() + word.slice(1)
           ).join(' '),
           description: `Advanced AI trading strategy powered by ${template.name} prompt template with optimized risk management`,
@@ -521,7 +521,7 @@ export default function MarketplaceAgentPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-black">
-        <MarketplaceHeader locale={locale} activeTab="marketplace" />
+        <AppHeader locale={locale} activeTab="marketplace" />
         <div className="flex items-center justify-center" style={{ minHeight: "calc(100vh - 73px)" }}>
           <div className="flex flex-col items-center gap-4">
             <div className="w-12 h-12 border-4 border-white/10 border-t-white/60 rounded-full animate-spin"></div>
@@ -536,7 +536,7 @@ export default function MarketplaceAgentPage() {
   if (!agent) {
     return (
       <div className="min-h-screen bg-black">
-        <MarketplaceHeader locale={locale} activeTab="marketplace" />
+        <AppHeader locale={locale} activeTab="marketplace" />
         <div className="flex items-center justify-center" style={{ minHeight: "calc(100vh - 73px)" }}>
           <div className="text-center">
             <h1 className="text-2xl font-medium text-white mb-4">{t('notFound')}</h1>
@@ -558,7 +558,7 @@ export default function MarketplaceAgentPage() {
       {/* Sticky Header */}
       <div className={`sticky top-0 z-50 bg-black/95 backdrop-blur-xl transition-all duration-700 delay-100 ${isPageLoaded ? 'translate-y-0 opacity-100' : '-translate-y-4 opacity-0'
         }`}>
-        <MarketplaceHeader locale={locale} activeTab="marketplace" />
+        <AppHeader locale={locale} activeTab="marketplace" />
 
         {/* Mobile Sticky Buying Section - Shows when scrolled */}
         <div className={`lg:hidden border-b border-white/[0.08] transition-all duration-300 overflow-hidden ${showMinimized ? 'max-h-[80px] opacity-100' : 'max-h-0 opacity-0'

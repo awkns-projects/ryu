@@ -9,12 +9,13 @@ import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import MarketplaceHeader from '@/components/marketplace-header'
+import AppHeader from '@/components/app-header'
 import PulsingCircle from '@/components/shader/pulsing-circle'
 import { Plus, ChevronRight, ChevronLeft, Loader2, TrendingUp, Wallet, Settings, Trash2, Activity, DollarSign, Check, FileText, Bot, ShoppingCart, ArrowUpRight, ArrowDownRight, Target, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Image from 'next/image'
 import { QRCodeSVG } from 'qrcode.react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 // Type for agent
 interface Agent {
@@ -104,6 +105,7 @@ export default function TradePage() {
   // Create agent modal state
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [currentStep, setCurrentStep] = useState(1)
+  const [stepDirection, setStepDirection] = useState<'forward' | 'backward'>('forward')
   const [isCreating, setIsCreating] = useState(false)
 
   // Deposit modal state
@@ -359,6 +361,7 @@ export default function TradePage() {
 
   const resetForm = () => {
     setCurrentStep(1)
+    setStepDirection('forward')
     setAgentName("")
     setSelectedTemplate(null)
     setCustomPrompt("")
@@ -459,11 +462,17 @@ export default function TradePage() {
   }
 
   const nextStep = () => {
-    if (currentStep < totalSteps) setCurrentStep(currentStep + 1)
+    if (currentStep < totalSteps) {
+      setStepDirection('forward')
+      setCurrentStep(currentStep + 1)
+    }
   }
 
   const prevStep = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1)
+    if (currentStep > 1) {
+      setStepDirection('backward')
+      setCurrentStep(currentStep - 1)
+    }
   }
 
   const canProceed = () => {
@@ -544,6 +553,7 @@ export default function TradePage() {
       setUseTemplate(true)
       setIsTemplatesModalOpen(false)
       setIsCreateModalOpen(true)
+      setStepDirection('forward')
       setCurrentStep(2)
 
       console.log('✅ Loaded template:', data.name)
@@ -571,7 +581,7 @@ export default function TradePage() {
   return (
     <div className="min-h-screen bg-black pb-20 md:pb-0">
       {/* Sticky Header */}
-      <MarketplaceHeader locale={locale} activeTab="trade" />
+      <AppHeader locale={locale} activeTab="trade" />
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
@@ -1192,254 +1202,336 @@ export default function TradePage() {
           </div>
 
           {/* Step Content */}
-          <div className="min-h-[400px]">
-            {/* Step 1: Agent Name */}
-            {currentStep === 1 && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">{t('step1Title')}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">{t('step1Description')}</p>
-                </div>
-                <Input
-                  placeholder={t('agentNamePlaceholder')}
-                  value={agentName}
-                  onChange={(e) => setAgentName(e.target.value)}
-                  className="text-lg p-6"
-                />
-              </div>
-            )}
+          <div className="min-h-[400px] relative overflow-hidden">
+            <AnimatePresence mode="wait" custom={stepDirection}>
+              {/* Step 1: Agent Name */}
+              {currentStep === 1 && (
+                <motion.div
+                  key="step-1"
+                  custom={stepDirection}
+                  initial={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? 100 : -100
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? -100 : 100
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">{t('step1Title')}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{t('step1Description')}</p>
+                  </div>
+                  <Input
+                    placeholder={t('agentNamePlaceholder')}
+                    value={agentName}
+                    onChange={(e) => setAgentName(e.target.value)}
+                    className="text-lg p-6"
+                  />
+                </motion.div>
+              )}
 
-            {/* Step 2: Template or Prompt */}
-            {currentStep === 2 && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">{t('step2Title')}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">{t('step2Description')}</p>
-                </div>
+              {/* Step 2: Template or Prompt */}
+              {currentStep === 2 && (
+                <motion.div
+                  key="step-2"
+                  custom={stepDirection}
+                  initial={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? 100 : -100
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? -100 : 100
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">{t('step2Title')}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{t('step2Description')}</p>
+                  </div>
 
-                {/* Toggle between template and custom */}
-                <div className="flex gap-2 mb-4">
-                  <Button
-                    variant={useTemplate ? "default" : "outline"}
-                    onClick={() => setUseTemplate(true)}
-                    className="flex-1"
-                  >
-                    {t('useTemplate')}
-                  </Button>
-                  <Button
-                    variant={!useTemplate ? "default" : "outline"}
-                    onClick={() => setUseTemplate(false)}
-                    className="flex-1"
-                  >
-                    {t('customPrompt')}
-                  </Button>
-                </div>
+                  {/* Toggle between template and custom */}
+                  <div className="flex gap-2 mb-4">
+                    <Button
+                      variant={useTemplate ? "default" : "outline"}
+                      onClick={() => setUseTemplate(true)}
+                      className="flex-1"
+                    >
+                      {t('useTemplate')}
+                    </Button>
+                    <Button
+                      variant={!useTemplate ? "default" : "outline"}
+                      onClick={() => setUseTemplate(false)}
+                      className="flex-1"
+                    >
+                      {t('customPrompt')}
+                    </Button>
+                  </div>
 
-                {useTemplate ? (
-                  <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
-                    {purchasedTemplates.length === 0 ? (
-                      <div className="col-span-2 text-center py-8 text-muted-foreground">
-                        <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-                        <p>Loading templates...</p>
-                      </div>
-                    ) : (
-                      purchasedTemplates.map((template) => (
+                  {useTemplate ? (
+                    <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
+                      {purchasedTemplates.length === 0 ? (
+                        <div className="col-span-2 text-center py-8 text-muted-foreground">
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                          <p>Loading templates...</p>
+                        </div>
+                      ) : (
+                        purchasedTemplates.map((template) => (
+                          <div
+                            key={template.name}
+                            className={cn(
+                              "group relative p-4 rounded-lg cursor-pointer transition-all duration-200",
+                              selectedTemplate?.name === template.name
+                                ? "bg-white/[0.08] border-2 border-white/40 shadow-lg shadow-white/10 ring-1 ring-white/20"
+                                : "bg-white/[0.03] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.05]"
+                            )}
+                            onClick={() => handleUseTemplate(template)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={cn(
+                                "w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 transition-all duration-200",
+                                selectedTemplate?.name === template.name
+                                  ? "ring-2 ring-white/40 shadow-lg"
+                                  : "ring-1 ring-white/10 group-hover:ring-white/20"
+                              )}>
+                                {template.image ? (
+                                  <Image
+                                    src={template.image}
+                                    alt={template.name}
+                                    width={48}
+                                    height={48}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <FileText className="w-5 h-5 text-white/60" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <h4 className={cn(
+                                    "font-semibold text-sm truncate capitalize transition-colors duration-200",
+                                    selectedTemplate?.name === template.name ? "text-white" : "text-white/70 group-hover:text-white/90"
+                                  )}>{template.name}</h4>
+                                  {selectedTemplate?.name === template.name && (
+                                    <div className="flex-shrink-0">
+                                      <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md">
+                                        <Check className="w-3 h-3 text-black stroke-[3]" />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                <p className={cn(
+                                  "text-xs line-clamp-2 mt-1 transition-colors duration-200",
+                                  selectedTemplate?.name === template.name ? "text-white/60" : "text-white/40 group-hover:text-white/50"
+                                )}>{template.description || 'Trading strategy template'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      placeholder={t('customPromptPlaceholder')}
+                      value={customPrompt}
+                      onChange={(e) => setCustomPrompt(e.target.value)}
+                      className="w-full h-48 p-4 rounded-lg border-2 border-black/10 focus:border-black/30 transition-all outline-none resize-none"
+                    />
+                  )}
+                </motion.div>
+              )}
+
+              {/* Step 3: Assets */}
+              {currentStep === 3 && (
+                <motion.div
+                  key="step-3"
+                  custom={stepDirection}
+                  initial={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? 100 : -100
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? -100 : 100
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">{t('step3Title')}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{t('step3Description')}</p>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-3 max-h-[420px] overflow-y-auto pr-2">
+                    {cryptoAssets.map((asset) => {
+                      const isSelected = selectedAssets.includes(asset.id)
+                      return (
                         <div
-                          key={template.name}
+                          key={asset.id}
                           className={cn(
-                            "group relative p-4 rounded-lg cursor-pointer transition-all duration-200",
-                            selectedTemplate?.name === template.name
+                            "group relative p-3.5 rounded-lg cursor-pointer transition-all duration-200 flex flex-col items-center justify-center text-center",
+                            isSelected
                               ? "bg-white/[0.08] border-2 border-white/40 shadow-lg shadow-white/10 ring-1 ring-white/20"
                               : "bg-white/[0.03] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.05]"
                           )}
-                          onClick={() => handleUseTemplate(template)}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedAssets(selectedAssets.filter(id => id !== asset.id))
+                            } else {
+                              setSelectedAssets([...selectedAssets, asset.id])
+                            }
+                          }}
                         >
-                          <div className="flex items-start gap-3">
-                            <div className={cn(
-                              "w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 transition-all duration-200",
-                              selectedTemplate?.name === template.name
-                                ? "ring-2 ring-white/40 shadow-lg"
-                                : "ring-1 ring-white/10 group-hover:ring-white/20"
-                            )}>
-                              {template.image ? (
-                                <Image
-                                  src={template.image}
-                                  alt={template.name}
-                                  width={48}
-                                  height={48}
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <FileText className="w-5 h-5 text-white/60" />
-                              )}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <h4 className={cn(
-                                  "font-semibold text-sm truncate capitalize transition-colors duration-200",
-                                  selectedTemplate?.name === template.name ? "text-white" : "text-white/70 group-hover:text-white/90"
-                                )}>{template.name}</h4>
-                                {selectedTemplate?.name === template.name && (
-                                  <div className="flex-shrink-0">
-                                    <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md">
-                                      <Check className="w-3 h-3 text-black stroke-[3]" />
-                                    </div>
-                                  </div>
-                                )}
+                          {isSelected && (
+                            <div className="absolute -top-1.5 -right-1.5">
+                              <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-lg">
+                                <Check className="w-3 h-3 text-black stroke-[3]" />
                               </div>
-                              <p className={cn(
-                                "text-xs line-clamp-2 mt-1 transition-colors duration-200",
-                                selectedTemplate?.name === template.name ? "text-white/60" : "text-white/40 group-hover:text-white/50"
-                              )}>{template.description || 'Trading strategy template'}</p>
                             </div>
-                          </div>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                ) : (
-                  <textarea
-                    placeholder={t('customPromptPlaceholder')}
-                    value={customPrompt}
-                    onChange={(e) => setCustomPrompt(e.target.value)}
-                    className="w-full h-48 p-4 rounded-lg border-2 border-black/10 focus:border-black/30 transition-all outline-none resize-none"
-                  />
-                )}
-              </div>
-            )}
-
-            {/* Step 3: Assets */}
-            {currentStep === 3 && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">{t('step3Title')}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">{t('step3Description')}</p>
-                </div>
-
-                <div className="grid grid-cols-4 gap-3 max-h-[420px] overflow-y-auto pr-2">
-                  {cryptoAssets.map((asset) => {
-                    const isSelected = selectedAssets.includes(asset.id)
-                    return (
-                      <div
-                        key={asset.id}
-                        className={cn(
-                          "group relative p-3.5 rounded-lg cursor-pointer transition-all duration-200 flex flex-col items-center justify-center text-center",
-                          isSelected
-                            ? "bg-white/[0.08] border-2 border-white/40 shadow-lg shadow-white/10 ring-1 ring-white/20"
-                            : "bg-white/[0.03] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.05]"
-                        )}
-                        onClick={() => {
-                          if (isSelected) {
-                            setSelectedAssets(selectedAssets.filter(id => id !== asset.id))
-                          } else {
-                            setSelectedAssets([...selectedAssets, asset.id])
-                          }
-                        }}
-                      >
-                        {isSelected && (
-                          <div className="absolute -top-1.5 -right-1.5">
-                            <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-lg">
-                              <Check className="w-3 h-3 text-black stroke-[3]" />
-                            </div>
-                          </div>
-                        )}
-                        <div className={cn(
-                          "w-11 h-11 rounded-lg flex items-center justify-center mb-2.5 p-2 transition-all duration-200",
-                          isSelected
-                            ? "bg-white/10 ring-1 ring-white/20"
-                            : "bg-white/[0.05] group-hover:bg-white/10"
-                        )}>
-                          <img
-                            src={getCryptoIconUrl(asset.symbol)}
-                            alt={asset.name}
-                            className="w-full h-full object-contain"
-                            onError={(e) => {
-                              // Fallback if image fails to load
-                              e.currentTarget.style.display = 'none'
-                            }}
-                          />
-                        </div>
-                        <div className="w-full">
+                          )}
                           <div className={cn(
-                            "font-semibold text-xs mb-0.5 transition-colors duration-200",
-                            isSelected ? "text-white" : "text-white/70 group-hover:text-white/90"
-                          )}>{asset.id}</div>
-                          <div className={cn(
-                            "text-[10px] transition-colors duration-200 line-clamp-1",
-                            isSelected ? "text-white/60" : "text-white/40 group-hover:text-white/50"
+                            "w-11 h-11 rounded-lg flex items-center justify-center mb-2.5 p-2 transition-all duration-200",
+                            isSelected
+                              ? "bg-white/10 ring-1 ring-white/20"
+                              : "bg-white/[0.05] group-hover:bg-white/10"
                           )}>
-                            {asset.name}
+                            <img
+                              src={getCryptoIconUrl(asset.symbol)}
+                              alt={asset.name}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                // Fallback if image fails to load
+                                e.currentTarget.style.display = 'none'
+                              }}
+                            />
+                          </div>
+                          <div className="w-full">
+                            <div className={cn(
+                              "font-semibold text-xs mb-0.5 transition-colors duration-200",
+                              isSelected ? "text-white" : "text-white/70 group-hover:text-white/90"
+                            )}>{asset.id}</div>
+                            <div className={cn(
+                              "text-[10px] transition-colors duration-200 line-clamp-1",
+                              isSelected ? "text-white/60" : "text-white/40 group-hover:text-white/50"
+                            )}>
+                              {asset.name}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+                      )
+                    })}
+                  </div>
+                </motion.div>
+              )}
 
-            {/* Step 4: Deposit */}
-            {currentStep === 4 && (
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-lg font-semibold mb-2">{t('step4Title')}</h3>
-                  <p className="text-sm text-muted-foreground mb-4">{t('step4Description')}</p>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="relative">
-                    <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black/40" />
-                    <Input
-                      type="number"
-                      placeholder="1000"
-                      value={deposit}
-                      onChange={(e) => setDeposit(e.target.value)}
-                      className="text-lg p-6 pl-12"
-                      min="0"
-                      step="100"
-                    />
+              {/* Step 4: Deposit */}
+              {currentStep === 4 && (
+                <motion.div
+                  key="step-4"
+                  custom={stepDirection}
+                  initial={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? 100 : -100
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? -100 : 100
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2">{t('step4Title')}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{t('step4Description')}</p>
                   </div>
 
-                  <div className="grid grid-cols-4 gap-2">
-                    {[100, 500, 1000, 5000].map((amount) => (
-                      <Button
-                        key={amount}
-                        variant="outline"
-                        onClick={() => setDeposit(amount.toString())}
-                        className="text-sm"
-                      >
-                        ${amount}
-                      </Button>
-                    ))}
-                  </div>
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black/40" />
+                      <Input
+                        type="number"
+                        placeholder="1000"
+                        value={deposit}
+                        onChange={(e) => setDeposit(e.target.value)}
+                        className="text-lg p-6 pl-12"
+                        min="0"
+                        step="100"
+                      />
+                    </div>
 
-                  {/* Summary */}
-                  <div className="p-6 rounded-xl bg-black/5 border border-black/10">
-                    <h4 className="font-semibold mb-3">{t('summary')}</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-black/60">{t('agentName')}:</span>
-                        <span className="font-medium">{agentName}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-black/60">{t('template')}:</span>
-                        <span className="font-medium capitalize">
-                          {useTemplate ? selectedTemplate?.name : t('customStrategy')}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-black/60">{t('assets')}:</span>
-                        <span className="font-medium">{selectedAssets.join(', ')}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-black/60">{t('initialDeposit')}:</span>
-                        <span className="font-medium">${deposit}</span>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[100, 500, 1000, 5000].map((amount) => (
+                        <Button
+                          key={amount}
+                          variant="outline"
+                          onClick={() => setDeposit(amount.toString())}
+                          className="text-sm"
+                        >
+                          ${amount}
+                        </Button>
+                      ))}
+                    </div>
+
+                    {/* Summary */}
+                    <div className="p-6 rounded-xl bg-black/5 border border-black/10">
+                      <h4 className="font-semibold mb-3">{t('summary')}</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-black/60">{t('agentName')}:</span>
+                          <span className="font-medium">{agentName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-black/60">{t('template')}:</span>
+                          <span className="font-medium capitalize">
+                            {useTemplate ? selectedTemplate?.name : t('customStrategy')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-black/60">{t('assets')}:</span>
+                          <span className="font-medium">{selectedAssets.join(', ')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-black/60">{t('initialDeposit')}:</span>
+                          <span className="font-medium">${deposit}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
-            )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Navigation Buttons */}
