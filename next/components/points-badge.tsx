@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { Sparkles } from "lucide-react"
 import { PointsActivityDialog } from "./points-activity-dialog"
+import { useTranslations } from "next-intl"
 
 interface PointsBadgeProps {
   points?: number
@@ -10,6 +11,7 @@ interface PointsBadgeProps {
 }
 
 export function PointsBadge({ points = 0, loading = false }: PointsBadgeProps) {
+  const t = useTranslations('pointsActivity')
   const [displayPoints, setDisplayPoints] = useState(0)
   const [isAnimating, setIsAnimating] = useState(false)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -68,7 +70,7 @@ export function PointsBadge({ points = 0, loading = false }: PointsBadgeProps) {
           cursor-pointer group
           ${isAnimating ? 'ring-2 ring-lime-400/50 scale-105 shadow-xl shadow-lime-500/50' : ''}
         `}
-        title="Click to view points activity"
+        title={t('clickToView')}
       >
         <Sparkles
           className={`

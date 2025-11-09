@@ -1064,5 +1064,14 @@
       "agents": "智能體",
       "price": "價格"
     }
+  },
+  "pointsActivity": {
+    "title": "積分活動",
+    "description": "追蹤您從各種活動中獲得的積分",
+    "totalPoints": "總積分",
+    "loading": "載入中...",
+    "noActivityYet": "尚無活動",
+    "noActivityDescription": "完成任務開始賺取積分！",
+    "clickToView": "點擊查看積分活動"
   }
 }

@@ -1062,5 +1062,14 @@
       "agents": "agents",
       "price": "Price"
     }
+  },
+  "pointsActivity": {
+    "title": "Points Activity",
+    "description": "Track your points earned from various activities",
+    "totalPoints": "Total Points",
+    "loading": "Loading...",
+    "noActivityYet": "No activity yet",
+    "noActivityDescription": "Start earning points by completing tasks!",
+    "clickToView": "Click to view points activity"
   }
 }

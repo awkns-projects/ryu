@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Sparkles, TrendingUp, TrendingDown, Calendar, Award } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
+import { useTranslations } from "next-intl"
 
 interface PointsActivity {
   id: string
@@ -20,6 +21,7 @@ interface PointsActivityDialogProps {
 }
 
 export function PointsActivityDialog({ open, onOpenChange, totalPoints }: PointsActivityDialogProps) {
+  const t = useTranslations('pointsActivity')
   const [activities, setActivities] = useState<PointsActivity[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -52,10 +54,10 @@ export function PointsActivityDialog({ open, onOpenChange, totalPoints }: Points
             <div className="p-2 rounded-lg bg-gradient-to-br from-lime-400/20 to-yellow-300/20 border border-lime-300/30">
               <Sparkles className="w-5 h-5 text-lime-400" />
             </div>
-            Points Activity
+            {t('title')}
           </DialogTitle>
           <DialogDescription>
-            Track your points earned from various activities
+            {t('description')}
           </DialogDescription>
         </DialogHeader>
 
@@ -63,7 +65,7 @@ export function PointsActivityDialog({ open, onOpenChange, totalPoints }: Points
         <div className="p-4 rounded-lg bg-gradient-to-br from-lime-400/10 to-yellow-300/10 border border-lime-300/20">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-muted-foreground">Total Points</p>
+              <p className="text-sm text-muted-foreground">{t('totalPoints')}</p>
               <p className="text-3xl font-bold text-lime-400">{totalPoints.toLocaleString()}</p>
             </div>
             <Award className="w-12 h-12 text-lime-400/30" />
@@ -81,8 +83,8 @@ export function PointsActivityDialog({ open, onOpenChange, totalPoints }: Points
               <div className="p-4 rounded-full bg-muted/50 mb-4">
                 <Sparkles className="w-8 h-8 text-muted-foreground" />
               </div>
-              <p className="text-sm text-muted-foreground">No activity yet</p>
-              <p className="text-xs text-muted-foreground mt-1">Start earning points by completing tasks!</p>
+              <p className="text-sm text-muted-foreground">{t('noActivityYet')}</p>
+              <p className="text-xs text-muted-foreground mt-1">{t('noActivityDescription')}</p>
             </div>
           ) : (
             activities.map((activity) => (

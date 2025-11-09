@@ -1062,5 +1062,14 @@
       "agents": "에이전트",
       "price": "가격"
     }
+  },
+  "pointsActivity": {
+    "title": "포인트 활동",
+    "description": "다양한 활동으로 획득한 포인트 추적",
+    "totalPoints": "총 포인트",
+    "loading": "로딩 중...",
+    "noActivityYet": "아직 활동이 없습니다",
+    "noActivityDescription": "작업을 완료하여 포인트를 획득하세요!",
+    "clickToView": "클릭하여 포인트 활동 보기"
   }
 }
