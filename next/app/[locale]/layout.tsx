@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation';
 import { locales } from '@/i18n';
 import { Toaster } from "sonner"
 import MobileBottomNav from "@/components/mobile-bottom-nav"
+import { PasswordAuthProvider } from "@/contexts/password-auth-context"
 import "../globals.css"
 
 const _geist = Geist({ subsets: ["latin"] })
@@ -81,9 +82,11 @@ export default async function LocaleLayout({
       <body className={`font-sans antialiased ${instrumentSerif.variable}`}>
         <NextIntlClientProvider messages={messages}>
           <ThemeProvider defaultTheme="dark" storageKey="ryu-theme">
-            {children}
-            <MobileBottomNav />
-            <Toaster position="top-right" richColors />
+            <PasswordAuthProvider>
+              {children}
+              <MobileBottomNav />
+              <Toaster position="top-right" richColors />
+            </PasswordAuthProvider>
           </ThemeProvider>
         </NextIntlClientProvider>
       </body>
