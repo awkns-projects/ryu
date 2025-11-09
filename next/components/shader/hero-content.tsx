@@ -2,11 +2,22 @@
 
 import { useTranslations, useLocale } from 'next-intl'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useState } from 'react'
 
 export default function HeroContent() {
   const t = useTranslations('shaderHero')
   const locale = useLocale()
   const router = useRouter()
+  const [isTransitioning, setIsTransitioning] = useState(false)
+
+  const handleNavigation = (path: string) => {
+    setIsTransitioning(true)
+    // Delay navigation to show animation
+    setTimeout(() => {
+      router.push(path)
+    }, 400)
+  }
 
   return (
     <main className="absolute bottom-8 left-8 z-20 max-w-2xl">
@@ -35,20 +46,39 @@ export default function HeroContent() {
 
         {/* Buttons */}
         <div className="flex items-center gap-4 flex-wrap">
-          <button
-            onClick={() => router.push(`/${locale}/explorer`)}
+          <motion.button
+            onClick={() => handleNavigation(`/${locale}/explorer`)}
             className="px-10 py-4 rounded-full bg-transparent border border-white/30 text-white font-normal text-base transition-all duration-200 hover:bg-white/10 hover:border-white/50 cursor-pointer"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={isTransitioning}
           >
             {t('viewExplorer')}
-          </button>
-          <button
-            onClick={() => router.push(`/${locale}/trade`)}
+          </motion.button>
+          <motion.button
+            onClick={() => handleNavigation(`/${locale}/trade`)}
             className="px-10 py-4 rounded-full bg-white text-black font-normal text-base transition-all duration-200 hover:bg-white/90 cursor-pointer"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            disabled={isTransitioning}
           >
             {t('startTrading')}
-          </button>
+          </motion.button>
         </div>
       </div>
+
+      {/* Page Transition Overlay */}
+      <AnimatePresence>
+        {isTransitioning && (
+          <motion.div
+            className="fixed inset-0 z-[100] bg-black pointer-events-none"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4, ease: [0.43, 0.13, 0.23, 0.96] }}
+          />
+        )}
+      </AnimatePresence>
     </main>
   )
 }
