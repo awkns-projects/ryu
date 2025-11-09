@@ -2,19 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
+// Interface matching the ACTUAL response from Go backend /api/my-traders
 interface BackendTrader {
   trader_id: string
   trader_name: string
   ai_model: string
-  exchange: string
-  total_equity: number
-  total_pnl: number
-  total_pnl_pct: number
-  position_count: number
-  margin_used_pct: number
+  exchange_id: string  // Note: it's exchange_id, not exchange
   is_running: boolean
-  symbols: string[]
-  created_at: string
+  initial_balance: number
 }
 
 interface Agent {
@@ -69,36 +64,82 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json()
-    console.log('✅ [API Route] Traders fetched:', data.traders?.length || 0)
+    
+    // Handle both array response and object with traders property
+    const tradersArray = Array.isArray(data) ? data : (data.traders || [])
+    console.log('✅ [API Route] Traders fetched:', tradersArray.length)
 
-    // Transform to frontend Agent format
-    const agents: Agent[] = (data.traders || []).map((trader: BackendTrader) => {
-      // Calculate initial deposit (total_equity - total_pnl)
-      const deposit = (trader.total_equity || 0) - (trader.total_pnl || 0)
+    // Fetch detailed config for each trader to get trading symbols and other data
+    const agentsPromises = tradersArray.map(async (trader: BackendTrader) => {
+      // Use initial_balance as deposit
+      const deposit = trader.initial_balance || 0
 
-      // Extract trading assets/symbols
-      const assets = Array.isArray(trader.symbols) ? trader.symbols : []
+      // Try to fetch trader config to get trading symbols
+      let assets: string[] = []
+      try {
+        const configResponse = await fetch(`${BACKEND_URL}/api/traders/${trader.trader_id}/config`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authHeader,
+          },
+        })
+        
+        if (configResponse.ok) {
+          const config = await configResponse.json()
+          // Parse trading symbols (e.g., "BTCUSDT,ETHUSDT" -> ["BTC", "ETH"])
+          if (config.trading_symbols) {
+            assets = config.trading_symbols
+              .split(',')
+              .map((s: string) => s.trim().replace('USDT', ''))
+              .filter((s: string) => s.length > 0)
+          }
+        }
+      } catch (err) {
+        console.warn(`⚠️ [API Route] Failed to fetch config for trader ${trader.trader_id}`)
+      }
 
-      // Format P&L string with sign and currency
-      const pnlValue = trader.total_pnl || 0
-      const pnlString = pnlValue >= 0
-        ? `+$${pnlValue.toFixed(2)}`
-        : `-$${Math.abs(pnlValue).toFixed(2)}`
+      // Try to fetch account info to get real-time PnL
+      let pnlString = '+$0.00'
+      let pnlPercent = 0
+      let totalActions = 0
+      
+      try {
+        const accountResponse = await fetch(`${BACKEND_URL}/api/account?trader_id=${trader.trader_id}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authHeader,
+          },
+        })
+        
+        if (accountResponse.ok) {
+          const account = await accountResponse.json()
+          const pnlValue = account.total_pnl || 0
+          pnlString = pnlValue >= 0
+            ? `+$${pnlValue.toFixed(2)}`
+            : `-$${Math.abs(pnlValue).toFixed(2)}`
+          pnlPercent = account.total_pnl_pct || 0
+          totalActions = account.position_count || 0
+        }
+      } catch (err) {
+        console.warn(`⚠️ [API Route] Failed to fetch account for trader ${trader.trader_id}`)
+      }
 
       return {
         id: trader.trader_id || `trader-${Date.now()}-${Math.random()}`,
         name: trader.trader_name || 'Unnamed Trader',
-        description: `${trader.ai_model || 'AI'} trading on ${trader.exchange || 'exchange'}`,
+        description: `${trader.ai_model || 'AI'} trading on ${trader.exchange_id || 'exchange'}`,
         icon: '🤖',
         status: trader.is_running === true ? 'active' : 'paused',
-        totalActions: trader.position_count || 0,
-        createdAt: trader.created_at || new Date().toISOString(),
+        totalActions: totalActions,
+        createdAt: new Date().toISOString(),
         deposit: deposit,
         assets: assets,
         pnl: pnlString,
-        pnlPercent: trader.total_pnl_pct || 0,
+        pnlPercent: pnlPercent,
       }
     })
+
+    const agents: Agent[] = await Promise.all(agentsPromises)
 
     // Calculate dashboard metrics
     const totalCapital = agents.reduce((sum, agent) => sum + agent.deposit, 0)
