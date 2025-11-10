@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils"
 import Image from 'next/image'
 import { QRCodeSVG } from 'qrcode.react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { AgentCard, CreateAgentModal, DepositModal, EditAgentModal, StartStopModal, TemplatesModal, WithdrawModal, PromptUpdateModal } from '@/components/trade'
 
 // Custom CSS for leverage slider
 const sliderStyles = `
@@ -81,6 +82,8 @@ interface Agent {
   assets?: string[]
   pnl?: string
   pnlPercent?: number
+  winRate?: number
+  walletAddress?: string
 }
 
 // Type for position
@@ -162,6 +165,9 @@ export default function TradePage() {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false)
   const [depositWalletAddress, setDepositWalletAddress] = useState("")
   const [createdTraderId, setCreatedTraderId] = useState("")
+  const [depositCurrentBalance, setDepositCurrentBalance] = useState(0)
+  const [depositRequiredBalance, setDepositRequiredBalance] = useState(0)
+  const [isCheckingBalance, setIsCheckingBalance] = useState(false)
 
   // Withdraw modal state
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
@@ -169,6 +175,12 @@ export default function TradePage() {
   const [withdrawAmount, setWithdrawAmount] = useState("")
   const [withdrawAddress, setWithdrawAddress] = useState("")
   const [isWithdrawing, setIsWithdrawing] = useState(false)
+
+  // Start/Stop confirmation modal state
+  const [isStartStopModalOpen, setIsStartStopModalOpen] = useState(false)
+  const [startStopAgentId, setStartStopAgentId] = useState("")
+  const [startStopAction, setStartStopAction] = useState<'start' | 'stop'>('start')
+  const [isStartingStoppingTrader, setIsStartingStoppingTrader] = useState(false)
 
   // Edit agent modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -181,6 +193,11 @@ export default function TradePage() {
   const [purchasedTemplates, setPurchasedTemplates] = useState<PromptTemplate[]>([])
   const [isLoadingTemplates, setIsLoadingTemplates] = useState(false)
 
+  // Prompt update modal state
+  const [isPromptModalOpen, setIsPromptModalOpen] = useState(false)
+  const [editingPromptAgentId, setEditingPromptAgentId] = useState("")
+  const [editingPromptCurrent, setEditingPromptCurrent] = useState("")
+
   // Form data
   const [agentName, setAgentName] = useState("")
   const [selectedTemplate, setSelectedTemplate] = useState<PromptTemplate | null>(null)
@@ -192,6 +209,10 @@ export default function TradePage() {
 
   // Tab state
   const [activeTab, setActiveTab] = useState("account")
+  const [selectedTraderId, setSelectedTraderId] = useState<string | null>(null)
+
+  // Sync balance state
+  const [isSyncingAll, setIsSyncingAll] = useState(false)
 
   const totalSteps = 4
 
@@ -220,9 +241,9 @@ export default function TradePage() {
         console.log('🔄 Fetching trading data...')
 
         // ========================
-        // STEP 1: Fetch Traders via Next.js API route
+        // STEP 1: Fetch Traders via Enhanced Next.js API route (with wallet + win rate)
         // ========================
-        const tradersResponse = await fetch('/api/go/trade/traders', {
+        const tradersResponse = await fetch('/api/go/trade/traders-enhanced', {
           headers: {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${token}`, // Send JWT token to API route
@@ -359,6 +380,10 @@ export default function TradePage() {
     try {
       console.log(`🔄 Fetching wallet address for trader ${agentId}...`)
 
+      // Find the agent to get required balance
+      const agent = agents.find(a => a.id === agentId)
+      const requiredBalance = agent?.deposit || 0
+
       // Step 1: Fetch trader config to get the exchange_id (using direct DB access)
       const traderResponse = await fetch(`/api/go/trade/trader-direct/${agentId}`, {
         headers: {
@@ -418,7 +443,31 @@ export default function TradePage() {
 
       console.log(`✅ Wallet address found: ${walletAddress}`)
 
-      // Open deposit modal with wallet address
+      // Fetch current balance
+      try {
+        const balanceResponse = await fetch(`/api/go/trade/account-balance/${agentId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (balanceResponse.ok) {
+          const balanceData = await balanceResponse.json()
+          setDepositCurrentBalance(balanceData.available_balance || 0)
+          // Use initial_balance from API if available, otherwise use agent.deposit
+          setDepositRequiredBalance(balanceData.initial_balance || requiredBalance)
+        } else {
+          setDepositCurrentBalance(0)
+          setDepositRequiredBalance(requiredBalance)
+        }
+      } catch (err) {
+        console.error('Failed to fetch balance:', err)
+        setDepositCurrentBalance(0)
+        setDepositRequiredBalance(requiredBalance)
+      }
+
+      // Open deposit modal with wallet address and balances
       setDepositWalletAddress(walletAddress)
       setCreatedTraderId(agentId)
       setIsDepositModalOpen(true)
@@ -428,9 +477,49 @@ export default function TradePage() {
     }
   }
 
+  // Check balance periodically when deposit modal is open
+  useEffect(() => {
+    if (!isDepositModalOpen || !createdTraderId) return
+
+    const checkBalance = async () => {
+      if (isCheckingBalance) return
+
+      setIsCheckingBalance(true)
+      try {
+        const balanceResponse = await fetch(`/api/go/trade/account-balance/${createdTraderId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (balanceResponse.ok) {
+          const balanceData = await balanceResponse.json()
+          setDepositCurrentBalance(balanceData.available_balance || 0)
+          // Also update required balance if initial_balance is available
+          if (balanceData.initial_balance) {
+            setDepositRequiredBalance(balanceData.initial_balance)
+          }
+        }
+      } catch (err) {
+        console.error('Failed to check balance:', err)
+      } finally {
+        setIsCheckingBalance(false)
+      }
+    }
+
+    // Check immediately
+    checkBalance()
+
+    // Then check every 10 seconds
+    const interval = setInterval(checkBalance, 10000)
+
+    return () => clearInterval(interval)
+  }, [isDepositModalOpen, createdTraderId, token])
+
   const refreshAgentsData = async () => {
     try {
-      const tradersResponse = await fetch('/api/go/trade/traders', {
+      const tradersResponse = await fetch('/api/go/trade/traders-enhanced', {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
@@ -512,6 +601,90 @@ export default function TradePage() {
       alert(`❌ Withdrawal failed: ${err.message}`)
     } finally {
       setIsWithdrawing(false)
+    }
+  }
+
+  const handleStartStopTrader = async (agentId: string, action: 'start' | 'stop') => {
+    const agent = agents.find(a => a.id === agentId)
+    if (!agent) return
+
+    // If starting, check if balance is sufficient
+    if (action === 'start') {
+      try {
+        // Fetch current account balance
+        const accountResponse = await fetch(`/api/go/trade/account-balance/${agentId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+
+        if (accountResponse.ok) {
+          const accountData = await accountResponse.json()
+          const availableBalance = accountData.available_balance || 0
+          const requiredDeposit = agent.deposit || 0
+
+          console.log(`💰 Balance check: Available=${availableBalance}, Required=${requiredDeposit}`)
+
+          // If insufficient funds, show deposit modal
+          if (availableBalance < requiredDeposit) {
+            console.log('⚠️ Insufficient balance - opening deposit modal')
+            await handleShowDepositForAgent(agentId)
+            return
+          }
+        }
+      } catch (err) {
+        console.error('❌ Failed to check balance:', err)
+      }
+    }
+
+    // Show confirmation modal
+    setStartStopAgentId(agentId)
+    setStartStopAction(action)
+    setIsStartStopModalOpen(true)
+  }
+
+  const confirmStartStopTrader = async () => {
+    if (!startStopAgentId) return
+
+    setIsStartingStoppingTrader(true)
+
+    try {
+      const endpoint = startStopAction === 'start'
+        ? `/api/go/trade/start-trader/${startStopAgentId}`
+        : `/api/go/trade/stop-trader/${startStopAgentId}`
+
+      console.log(`🔄 ${startStopAction === 'start' ? 'Starting' : 'Stopping'} trader ${startStopAgentId}...`)
+
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `Failed to ${startStopAction} trader`)
+      }
+
+      const result = await response.json()
+      console.log(`✅ Trader ${startStopAction}ed successfully:`, result)
+
+      // Close modal
+      setIsStartStopModalOpen(false)
+      setStartStopAgentId("")
+
+      // Refresh agents data
+      await refreshAgentsData()
+
+      alert(`✅ Trader ${startStopAction}ed successfully!`)
+    } catch (err: any) {
+      console.error(`❌ Failed to ${startStopAction} trader:`, err)
+      alert(`❌ Failed to ${startStopAction} trader: ${err.message}`)
+    } finally {
+      setIsStartingStoppingTrader(false)
     }
   }
 
@@ -661,6 +834,82 @@ export default function TradePage() {
     setLeverage(5)
   }
 
+  // Edit prompt for an agent
+  const handleEditPrompt = async (agentId: string) => {
+    if (!user || !token) return
+
+    const agent = agents.find(a => a.id === agentId)
+    if (!agent) return
+
+    // Try to get current prompt from agent data
+    const agentAny = agent as any
+    setEditingPromptAgentId(agentId)
+    setEditingPromptCurrent(agentAny.customPrompt || '')
+    setIsPromptModalOpen(true)
+  }
+
+  // Sync balance for a single agent
+  const handleSyncBalance = async (agentId: string) => {
+    if (!user || !token) return
+
+    try {
+      console.log(`🔄 Syncing balance for agent ${agentId}...`)
+
+      const response = await fetch(`/api/go/trade/sync-balance/${agentId}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to sync balance')
+      }
+
+      console.log('✅ Balance synced successfully')
+
+      // Refresh page to show updated balance
+      window.location.reload()
+    } catch (error) {
+      console.error('❌ Failed to sync balance:', error)
+      alert('Failed to sync balance. Please try again.')
+    }
+  }
+
+  // Sync balance for all agents
+  const handleSyncAllBalances = async () => {
+    if (!user || !token) return
+
+    setIsSyncingAll(true)
+    try {
+      console.log('🔄 Syncing balances for all agents...')
+
+      // Sync each agent sequentially
+      for (const agent of agents) {
+        await fetch(`/api/go/trade/sync-balance/${agent.id}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        })
+      }
+
+      console.log('✅ All balances synced successfully')
+
+      alert('All balances synced successfully!')
+
+      // Refresh page to show updated balances
+      window.location.reload()
+    } catch (error) {
+      console.error('❌ Failed to sync some balances:', error)
+      alert('Failed to sync some balances. Please try again.')
+    } finally {
+      setIsSyncingAll(false)
+    }
+  }
+
   const handleCreateAgent = async () => {
     if (!user || !token) return
 
@@ -793,7 +1042,7 @@ export default function TradePage() {
       // Refresh agents list and verify settings via Next.js API route
       console.log('🔄 Refreshing traders list and verifying settings...')
 
-      const tradersResponse = await fetch('/api/go/trade/traders', {
+      const tradersResponse = await fetch('/api/go/trade/traders-enhanced', {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`, // Send JWT token to API route
@@ -833,16 +1082,23 @@ export default function TradePage() {
         console.warn('⚠️ Failed to refresh traders:', tradersResponse.status)
       }
 
-      // Check if we need to show the deposit modal
-      if (result.needsDeposit && result.walletAddress) {
-        console.log('💰 Opening deposit modal for wallet:', result.walletAddress)
-        setDepositWalletAddress(result.walletAddress)
-        setCreatedTraderId(result.trader?.trader_id || '')
+      // Always show deposit modal after creating trader
+      if (traderId) {
+        console.log('💰 Opening deposit modal for newly created trader:', traderId)
+
+        // Close the create modal first
         setIsCreateModalOpen(false)
-        setIsDepositModalOpen(true)
         resetForm()
+
+        // Fetch wallet address and show deposit modal
+        try {
+          await handleShowDepositForAgent(traderId)
+        } catch (err) {
+          console.error('❌ Failed to show deposit modal:', err)
+          // If we can't show deposit modal, at least the trader was created successfully
+        }
       } else {
-        // Just close the create modal if no deposit needed
+        // Just close the create modal if no trader ID
         setIsCreateModalOpen(false)
         resetForm()
       }
@@ -1066,39 +1322,41 @@ export default function TradePage() {
 
           {/* Tabs Navigation */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full max-w-2xl mx-auto grid-cols-3 bg-white/[0.03] border border-white/[0.08] p-1 h-auto">
-              <TabsTrigger
-                value="account"
-                className="data-[state=active]:bg-white data-[state=active]:text-black text-white/60 flex items-center gap-2 py-2"
-              >
-                <BarChart3 className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('tabs.account')}</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="agents"
-                className="data-[state=active]:bg-white data-[state=active]:text-black text-white/60 flex items-center gap-2 py-2"
-              >
-                <Bot className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('tabs.agents')}</span>
-                {agents.length > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-white/10 data-[state=active]:bg-black/10">
-                    {agents.length}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger
-                value="positions"
-                className="data-[state=active]:bg-white data-[state=active]:text-black text-white/60 flex items-center gap-2 py-2"
-              >
-                <TrendingUp className="w-4 h-4" />
-                <span className="hidden sm:inline">{t('tabs.positions')}</span>
-                {positions.length > 0 && (
-                  <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-white/10 data-[state=active]:bg-black/10">
-                    {positions.length}
-                  </span>
-                )}
-              </TabsTrigger>
-            </TabsList>
+            <div className="flex justify-center overflow-x-auto">
+              <TabsList className="inline-flex w-auto bg-white/[0.03] border border-white/[0.08] p-1 h-auto">
+                <TabsTrigger
+                  value="account"
+                  className="data-[state=active]:bg-white data-[state=active]:text-black text-white/60 flex items-center gap-2 py-2 px-4"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t('tabs.account')}</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="agents"
+                  className="data-[state=active]:bg-white data-[state=active]:text-black text-white/60 flex items-center gap-2 py-2 px-4"
+                >
+                  <Bot className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t('tabs.agents')}</span>
+                  {agents.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-white/10 data-[state=active]:bg-black/10">
+                      {agents.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="positions"
+                  className="data-[state=active]:bg-white data-[state=active]:text-black text-white/60 flex items-center gap-2 py-2 px-4"
+                >
+                  <TrendingUp className="w-4 h-4" />
+                  <span className="hidden sm:inline">{t('tabs.positions')}</span>
+                  {positions.length > 0 && (
+                    <span className="ml-1 px-1.5 py-0.5 text-[10px] rounded-full bg-white/10 data-[state=active]:bg-black/10">
+                      {positions.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+            </div>
 
             {/* Action Bar - Always Visible */}
             <div className="flex items-center justify-end gap-2 mt-6 mb-4">
@@ -1189,7 +1447,7 @@ export default function TradePage() {
                     <div className="p-4 md:p-6 rounded-xl bg-white/[0.02] border border-white/[0.06] backdrop-blur-xl mb-6">
                       {/* Header */}
                       <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-6 gap-4">
-                        <div>
+                        <div className="flex-1">
                           <h2 className="text-sm font-semibold text-white/60 mb-3 uppercase tracking-wider">Account Equity Curve</h2>
                           <div className="flex items-baseline gap-3 mb-2">
                             <div className="text-4xl md:text-5xl font-bold text-white tabular-nums">
@@ -1215,6 +1473,25 @@ export default function TradePage() {
 
                         {/* Toggle Buttons */}
                         <div className="flex items-center gap-2">
+                          <Button
+                            onClick={handleSyncAllBalances}
+                            disabled={isSyncingAll || agents.length === 0}
+                            variant="outline"
+                            size="sm"
+                            className="bg-white/[0.03] text-white hover:bg-white/[0.05] border border-white/[0.08] gap-2 backdrop-blur-sm h-8 px-3 text-xs"
+                          >
+                            {isSyncingAll ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                Syncing...
+                              </>
+                            ) : (
+                              <>
+                                <Activity className="w-3.5 h-3.5" />
+                                Sync All Balances
+                              </>
+                            )}
+                          </Button>
                           <button className="px-3 py-1.5 rounded-lg bg-yellow-500/20 border border-yellow-500/30 text-yellow-400 text-xs font-semibold flex items-center gap-1.5 hover:bg-yellow-500/30 transition-all">
                             <DollarSign className="w-3 h-3" />
                             USD
@@ -1357,138 +1634,20 @@ export default function TradePage() {
                     <p className="text-sm text-white/50 max-w-md mx-auto">{t('noAgentsDescription')}</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="grid md:grid-cols-2 gap-3">
                     {agents.map((agent) => (
-                      <div
+                      <AgentCard
                         key={agent.id}
-                        className="relative p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all duration-300 cursor-pointer group backdrop-blur-sm overflow-hidden"
-                        onClick={() => {
-                          console.log('🔍 Clicking trader with ID:', agent.id)
-                          console.log('🔍 Full agent data:', agent)
-                          router.push(`/${locale}/trader/${agent.id}`)
-                        }}
-                      >
-                        {/* Shimmer effect on hover */}
-                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.02] to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-
-                        <div className="relative z-10">
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="text-3xl">{agent.icon}</div>
-                            <div className="flex gap-1.5">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-white/60 hover:text-green-400 hover:bg-white/[0.05]"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleShowDepositForAgent(agent.id)
-                                }}
-                                title="Deposit Funds"
-                              >
-                                <CirclePlus className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-white/60 hover:text-amber-400 hover:bg-white/[0.05]"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleShowWithdrawForAgent(agent.id)
-                                }}
-                                title="Withdraw Funds"
-                              >
-                                <CircleMinus className="w-3.5 h-3.5" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-white/60 hover:text-white hover:bg-white/[0.05]"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleEditAgent(agent.id)
-                                }}
-                                title="Edit Agent Settings"
-                              >
-                                <Settings className="w-3.5 h-3.5" />
-                              </Button>
-                              {/* Delete button disabled */}
-                              {/* <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-white/60 hover:text-red-400 hover:bg-white/[0.05]"
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  handleDeleteAgent(agent.id)
-                                }}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button> */}
-                            </div>
-                          </div>
-
-                          <div className="space-y-3">
-                            <div>
-                              <h3 className="text-base font-semibold text-white mb-1 group-hover:text-white/90 transition-colors">{agent.name}</h3>
-                              <p className="text-xs text-white/50 line-clamp-2">{agent.description}</p>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              <span className={cn(
-                                "text-[10px] px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1",
-                                agent.status === "active"
-                                  ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                                  : "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
-                              )}>
-                                <div className={cn(
-                                  "w-1 h-1 rounded-full",
-                                  agent.status === "active" ? "bg-green-400 animate-pulse" : "bg-yellow-400"
-                                )}></div>
-                                {agent.status === "active" ? t('statusActive') : t('statusPaused')}
-                              </span>
-                            </div>
-
-                            <div className="pt-3 border-t border-white/[0.06] space-y-2">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-white/40 flex items-center gap-1.5">
-                                  <Wallet className="w-3 h-3" />
-                                  {t('deposit')}
-                                </span>
-                                <span className="font-semibold text-white tabular-nums">${agent.deposit?.toFixed(2)}</span>
-                              </div>
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-white/40 flex items-center gap-1.5">
-                                  <TrendingUp className="w-3 h-3" />
-                                  {t('pnl')}
-                                </span>
-                                <div className="text-right">
-                                  <div className={cn(
-                                    "font-semibold tabular-nums",
-                                    (agent.pnlPercent || 0) >= 0 ? "text-green-400" : "text-red-400"
-                                  )}>
-                                    {agent.pnl}
-                                  </div>
-                                  <div className={cn(
-                                    "text-[10px] tabular-nums",
-                                    (agent.pnlPercent || 0) >= 0 ? "text-green-400/70" : "text-red-400/70"
-                                  )}>
-                                    {(agent.pnlPercent || 0) >= 0 ? '+' : ''}{(agent.pnlPercent || 0).toFixed(2)}%
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-white/40 flex items-center gap-1.5">
-                                  <Activity className="w-3 h-3" />
-                                  {t('assets')}
-                                </span>
-                                <span className="font-medium text-white text-[10px]">{agent.assets?.join(', ')}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Hover indicator */}
-                        <ChevronRight className="absolute right-3 bottom-3 w-4 h-4 text-white/20 group-hover:text-white/40 group-hover:translate-x-0.5 transition-all" />
-                      </div>
+                        agent={agent}
+                        locale={locale}
+                        onDeposit={handleShowDepositForAgent}
+                        onWithdraw={handleShowWithdrawForAgent}
+                        onEdit={handleEditAgent}
+                        onEditPrompt={handleEditPrompt}
+                        onStartStop={handleStartStopTrader}
+                        onSyncBalance={handleSyncBalance}
+                        t={t}
+                      />
                     ))}
                   </div>
                 )}
@@ -1650,1303 +1809,149 @@ export default function TradePage() {
       </div>
 
       {/* Create Agent Modal */}
-      <Dialog open={isCreateModalOpen} onOpenChange={(open) => {
-        setIsCreateModalOpen(open)
-        if (!open) resetForm()
-      }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-black border-white/20">
-          <DialogHeader>
-            <DialogTitle className="text-2xl text-white">{t('createNewAgent')}</DialogTitle>
-            <DialogDescription className="text-white/60">
-              {t('createAgentDescription')}
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Progress Bar */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-2 px-1">
-              <span className="text-xs font-medium text-white/70">
-                Step {currentStep} of {totalSteps}
-              </span>
-              <span className="text-xs font-semibold text-white">
-                {Math.round((currentStep / totalSteps) * 100)}%
-              </span>
-            </div>
-            <div className="relative h-2.5 bg-white/[0.12] rounded-full overflow-hidden border border-white/[0.08]">
-              <motion.div
-                className="absolute top-0 left-0 h-full bg-white rounded-full shadow-lg"
-                initial={{ width: 0 }}
-                animate={{ width: `${(currentStep / totalSteps) * 100}%` }}
-                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              />
-            </div>
-            {/* Step Labels */}
-            <div className="flex justify-between mt-3 px-1">
-              {['Name', 'Strategy', 'Assets', 'Deposit'].map((label, index) => (
-                <div
-                  key={label}
-                  className={cn(
-                    "text-[10px] font-medium transition-colors",
-                    currentStep > index + 1
-                      ? "text-white/80"
-                      : currentStep === index + 1
-                        ? "text-white font-bold"
-                        : "text-white/35"
-                  )}
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Step Content */}
-          <div className="min-h-[400px] relative overflow-hidden">
-            <AnimatePresence mode="wait" custom={stepDirection}>
-              {/* Step 1: Agent Name */}
-              {currentStep === 1 && (
-                <motion.div
-                  key="step-1"
-                  custom={stepDirection}
-                  initial={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? 100 : -100
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? -100 : 100
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    ease: [0.4, 0, 0.2, 1]
-                  }}
-                  className="space-y-4"
-                >
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step1Title')}</h3>
-                    <p className="text-sm text-white/60 mb-4">{t('step1Description')}</p>
-                  </div>
-                  <Input
-                    placeholder={t('agentNamePlaceholder')}
-                    value={agentName}
-                    onChange={(e) => setAgentName(e.target.value)}
-                    className="text-lg p-6"
-                  />
-                </motion.div>
-              )}
-
-              {/* Step 2: Template or Prompt */}
-              {currentStep === 2 && (
-                <motion.div
-                  key="step-2"
-                  custom={stepDirection}
-                  initial={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? 100 : -100
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? -100 : 100
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    ease: [0.4, 0, 0.2, 1]
-                  }}
-                  className="space-y-4"
-                >
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step2Title')}</h3>
-                    <p className="text-sm text-white/60 mb-4">{t('step2Description')}</p>
-                  </div>
-
-                  {/* Toggle between template and custom */}
-                  <div className="flex gap-2 mb-4">
-                    <Button
-                      variant={useTemplate ? "default" : "outline"}
-                      onClick={() => setUseTemplate(true)}
-                      className="flex-1"
-                    >
-                      {t('useTemplate')}
-                    </Button>
-                    <Button
-                      variant={!useTemplate ? "default" : "outline"}
-                      onClick={() => setUseTemplate(false)}
-                      className="flex-1"
-                    >
-                      {t('customPrompt')}
-                    </Button>
-                  </div>
-
-                  {useTemplate ? (
-                    <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
-                      {purchasedTemplates.length === 0 ? (
-                        <div className="col-span-2 text-center py-8 text-muted-foreground">
-                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-                          <p>Loading templates...</p>
-                        </div>
-                      ) : (
-                        purchasedTemplates.map((template) => (
-                          <div
-                            key={template.name}
-                            className={cn(
-                              "group relative p-4 rounded-lg cursor-pointer transition-all duration-200",
-                              selectedTemplate?.name === template.name
-                                ? "bg-white/[0.08] border-2 border-white/40 shadow-lg shadow-white/10 ring-1 ring-white/20"
-                                : "bg-white/[0.03] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.05]"
-                            )}
-                            onClick={() => handleUseTemplate(template)}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className={cn(
-                                "w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 transition-all duration-200",
-                                selectedTemplate?.name === template.name
-                                  ? "ring-2 ring-white/40 shadow-lg"
-                                  : "ring-1 ring-white/10 group-hover:ring-white/20"
-                              )}>
-                                {template.image ? (
-                                  <Image
-                                    src={template.image}
-                                    alt={template.name}
-                                    width={48}
-                                    height={48}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <FileText className="w-5 h-5 text-white/60" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-2">
-                                  <h4 className={cn(
-                                    "font-semibold text-sm truncate capitalize transition-colors duration-200",
-                                    selectedTemplate?.name === template.name ? "text-white" : "text-white/70 group-hover:text-white/90"
-                                  )}>{template.name}</h4>
-                                  {selectedTemplate?.name === template.name && (
-                                    <div className="flex-shrink-0">
-                                      <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md">
-                                        <Check className="w-3 h-3 text-black stroke-[3]" />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <p className={cn(
-                                  "text-xs line-clamp-2 mt-1 transition-colors duration-200",
-                                  selectedTemplate?.name === template.name ? "text-white/60" : "text-white/40 group-hover:text-white/50"
-                                )}>{template.description || 'Trading strategy template'}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  ) : (
-                    <textarea
-                      placeholder={t('customPromptPlaceholder')}
-                      value={customPrompt}
-                      onChange={(e) => setCustomPrompt(e.target.value)}
-                      className="w-full h-48 p-4 rounded-lg border-2 border-black/10 focus:border-black/30 transition-all outline-none resize-none"
-                    />
-                  )}
-                </motion.div>
-              )}
-
-              {/* Step 3: Assets */}
-              {currentStep === 3 && (
-                <motion.div
-                  key="step-3"
-                  custom={stepDirection}
-                  initial={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? 100 : -100
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? -100 : 100
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    ease: [0.4, 0, 0.2, 1]
-                  }}
-                  className="space-y-4"
-                >
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step3Title')}</h3>
-                    <p className="text-sm text-white/60 mb-4">{t('step3Description')}</p>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-3 max-h-[420px] overflow-y-auto pr-2">
-                    {cryptoAssets.map((asset) => {
-                      const isSelected = selectedAssets.includes(asset.id)
-                      return (
-                        <div
-                          key={asset.id}
-                          className={cn(
-                            "group relative p-3.5 rounded-lg cursor-pointer transition-all duration-200 flex flex-col items-center justify-center text-center",
-                            isSelected
-                              ? "bg-white/[0.08] border-2 border-white/40 shadow-lg shadow-white/10 ring-1 ring-white/20"
-                              : "bg-white/[0.03] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.05]"
-                          )}
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedAssets(selectedAssets.filter(id => id !== asset.id))
-                            } else {
-                              setSelectedAssets([...selectedAssets, asset.id])
-                            }
-                          }}
-                        >
-                          {isSelected && (
-                            <div className="absolute -top-1.5 -right-1.5">
-                              <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-lg">
-                                <Check className="w-3 h-3 text-black stroke-[3]" />
-                              </div>
-                            </div>
-                          )}
-                          <div className={cn(
-                            "w-11 h-11 rounded-lg flex items-center justify-center mb-2.5 p-2 transition-all duration-200",
-                            isSelected
-                              ? "bg-white/10 ring-1 ring-white/20"
-                              : "bg-white/[0.05] group-hover:bg-white/10"
-                          )}>
-                            <img
-                              src={getCryptoIconUrl(asset.symbol)}
-                              alt={asset.name}
-                              className="w-full h-full object-contain"
-                              onError={(e) => {
-                                // Fallback if image fails to load
-                                e.currentTarget.style.display = 'none'
-                              }}
-                            />
-                          </div>
-                          <div className="w-full">
-                            <div className={cn(
-                              "font-semibold text-xs mb-0.5 transition-colors duration-200",
-                              isSelected ? "text-white" : "text-white/70 group-hover:text-white/90"
-                            )}>{asset.id}</div>
-                            <div className={cn(
-                              "text-[10px] transition-colors duration-200 line-clamp-1",
-                              isSelected ? "text-white/60" : "text-white/40 group-hover:text-white/50"
-                            )}>
-                              {asset.name}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Step 4: Deposit */}
-              {currentStep === 4 && (
-                <motion.div
-                  key="step-4"
-                  custom={stepDirection}
-                  initial={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? 100 : -100
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? -100 : 100
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    ease: [0.4, 0, 0.2, 1]
-                  }}
-                  className="space-y-4"
-                >
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step4Title')}</h3>
-                    <p className="text-sm text-white/60 mb-4">{t('step4Description')}</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="relative">
-                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-black/40" />
-                      <Input
-                        type="number"
-                        placeholder="1000"
-                        value={deposit}
-                        onChange={(e) => setDeposit(e.target.value)}
-                        className="text-lg p-6 pl-12"
-                        min="0"
-                        step="100"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-4 gap-2">
-                      {[100, 500, 1000, 5000].map((amount) => (
-                        <Button
-                          key={amount}
-                          variant="outline"
-                          onClick={() => setDeposit(amount.toString())}
-                          className="text-sm"
-                        >
-                          ${amount}
-                        </Button>
-                      ))}
-                    </div>
-
-                    {/* Leverage Settings */}
-                    <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between mb-5">
-                        <h4 className="font-semibold text-white/80">
-                          Leverage
-                        </h4>
-                        <div className="flex items-center gap-3">
-                          <span className="text-3xl font-bold text-white tabular-nums">{leverage}x</span>
-                          <div className={`px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide uppercase ${leverage <= 5
-                            ? 'bg-white/5 text-white/50 border border-white/10'
-                            : leverage <= 10
-                              ? 'bg-white/8 text-white/60 border border-white/15'
-                              : 'bg-white/12 text-white/70 border border-white/20'
-                            }`}>
-                            {leverage <= 5 ? 'Safe' : leverage <= 10 ? 'Medium' : 'High'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="relative pt-2 pb-3">
-                          <input
-                            type="range"
-                            min="1"
-                            max="20"
-                            step="1"
-                            value={leverage}
-                            onChange={(e) => setLeverage(Number(e.target.value))}
-                            className="w-full h-2.5 rounded-full appearance-none cursor-grab active:cursor-grabbing slider-thumb"
-                            style={{
-                              background: `linear-gradient(to right, 
-                                rgba(255, 255, 255, 0.08) 0%, 
-                                rgba(255, 255, 255, 0.15) ${(leverage / 20) * 50}%, 
-                                rgba(255, 255, 255, 0.22) ${(leverage / 20) * 100}%)`
-                            }}
-                          />
-                          <div className="flex justify-between text-[10px] font-medium text-white/40 mt-2 px-0.5">
-                            <span>1x</span>
-                            <span>5x</span>
-                            <span>10x</span>
-                            <span>15x</span>
-                            <span>20x</span>
-                          </div>
-                        </div>
-
-                        {/* Quick Select Buttons */}
-                        <div className="grid grid-cols-5 gap-2">
-                          {[1, 3, 5, 10, 20].map((lev) => (
-                            <button
-                              key={lev}
-                              type="button"
-                              onClick={() => setLeverage(lev)}
-                              className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${leverage === lev
-                                ? 'bg-white text-black shadow-sm'
-                                : 'bg-white/[0.05] text-white/50 hover:bg-white/[0.08] hover:text-white/70 border border-white/[0.08]'
-                                }`}
-                            >
-                              {lev}x
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="flex items-start gap-2.5 p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-lg">
-                          <span className="text-white/40 text-xs mt-0.5">ℹ️</span>
-                          <p className="text-[11px] text-white/60 leading-relaxed">
-                            <strong className="font-semibold text-white/70">Risk Notice:</strong> Higher leverage multiplies both gains and losses.
-                            {leverage > 10 ? ' You selected high leverage — trade carefully.' : ' Lower leverage is safer for most traders.'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Summary */}
-                    <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <h4 className="font-semibold mb-3 text-white">{t('summary')}</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-white/60">{t('agentName')}:</span>
-                          <span className="font-medium text-white">{agentName}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-white/60">{t('template')}:</span>
-                          <span className="font-medium capitalize text-white">
-                            {useTemplate ? selectedTemplate?.name : t('customStrategy')}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-white/60">{t('assets')}:</span>
-                          <span className="font-medium text-white">{selectedAssets.join(', ')}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-white/60">{t('initialDeposit')}:</span>
-                          <span className="font-medium text-white">${deposit}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Navigation Buttons */}
-          <div className="flex items-center justify-between gap-3 pt-6 border-t">
-            <Button
-              variant="outline"
-              onClick={prevStep}
-              disabled={currentStep === 1}
-              className="gap-2"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              {t('previous')}
-            </Button>
-
-            <div className="flex-1" />
-
-            {currentStep < totalSteps ? (
-              <Button
-                onClick={nextStep}
-                disabled={!canProceed()}
-                className="gap-2 bg-white text-black hover:bg-white/90 font-medium"
-              >
-                {t('next')}
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleCreateAgent}
-                disabled={!canProceed() || isCreating}
-                className="gap-2 bg-white text-black hover:bg-white/90 font-semibold shadow-lg"
-              >
-                {isCreating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {t('creating')}
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    {t('createAgent')}
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CreateAgentModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        currentStep={currentStep}
+        stepDirection={stepDirection}
+        totalSteps={totalSteps}
+        agentName={agentName}
+        selectedTemplate={selectedTemplate}
+        customPrompt={customPrompt}
+        useTemplate={useTemplate}
+        selectedAssets={selectedAssets}
+        deposit={deposit}
+        leverage={leverage}
+        isCreating={isCreating}
+        purchasedTemplates={purchasedTemplates}
+        cryptoAssets={cryptoAssets}
+        onAgentNameChange={setAgentName}
+        onTemplateSelect={setSelectedTemplate}
+        onCustomPromptChange={setCustomPrompt}
+        onUseTemplateToggle={setUseTemplate}
+        onAssetsChange={setSelectedAssets}
+        onDepositChange={setDeposit}
+        onLeverageChange={setLeverage}
+        onNext={nextStep}
+        onPrevious={prevStep}
+        onCreate={handleCreateAgent}
+        onReset={resetForm}
+        getCryptoIconUrl={getCryptoIconUrl}
+        t={t}
+      />
 
       {/* Edit Agent Modal */}
-      <Dialog open={isEditModalOpen} onOpenChange={(open) => {
-        setIsEditModalOpen(open)
-        if (!open) {
+      <EditAgentModal
+        isOpen={isEditModalOpen}
+        onClose={() => setIsEditModalOpen(false)}
+        currentStep={currentStep}
+        stepDirection={stepDirection}
+        totalSteps={totalSteps}
+        agentName={agentName}
+        selectedTemplate={selectedTemplate}
+        customPrompt={customPrompt}
+        useTemplate={useTemplate}
+        selectedAssets={selectedAssets}
+        deposit={deposit}
+        leverage={leverage}
+        isUpdating={isCreating}
+        editConfigLoaded={editConfigLoaded}
+        purchasedTemplates={purchasedTemplates}
+        cryptoAssets={cryptoAssets}
+        onAgentNameChange={setAgentName}
+        onTemplateSelect={setSelectedTemplate}
+        onCustomPromptChange={setCustomPrompt}
+        onUseTemplateToggle={setUseTemplate}
+        onAssetsChange={setSelectedAssets}
+        onDepositChange={setDeposit}
+        onLeverageChange={setLeverage}
+        onNext={nextStep}
+        onPrevious={prevStep}
+        onUpdate={handleCreateAgent}
+        onReset={() => {
           resetForm()
           setEditingAgentId('')
           setEditConfigLoaded(false)
-        }
-      }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-black border-white/20">
-          <DialogHeader>
-            <DialogTitle className="text-2xl text-white">Edit Agent Settings</DialogTitle>
-            <DialogDescription className="text-white/60">
-              Update your AI trading agent's configuration
-            </DialogDescription>
-          </DialogHeader>
-
-          {/* Warning if settings couldn't be loaded */}
-          {!editConfigLoaded && (
-            <div className="mb-4 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-              <div className="flex items-start gap-3">
-                <span className="text-yellow-500 text-lg mt-0.5">⚠️</span>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-yellow-500 mb-1">Settings Not Loaded</h4>
-                  <p className="text-sm text-yellow-500/80 leading-relaxed">
-                    Your previous settings (assets, leverage, strategy) couldn't be retrieved from the server.
-                    Please reconfigure your agent settings. <strong>Your settings WILL be saved</strong> when you click Update.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Progress Bar */}
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-2 px-1">
-              <span className="text-xs font-medium text-white/70">
-                Step {currentStep} of {totalSteps}
-              </span>
-              <span className="text-xs font-semibold text-white">
-                {Math.round((currentStep / totalSteps) * 100)}%
-              </span>
-            </div>
-            <div className="relative h-2.5 bg-white/[0.12] rounded-full overflow-hidden border border-white/[0.08]">
-              <motion.div
-                className="absolute top-0 left-0 h-full bg-white rounded-full shadow-lg"
-                initial={{ width: 0 }}
-                animate={{ width: `${(currentStep / totalSteps) * 100}%` }}
-                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              />
-            </div>
-            {/* Step Labels */}
-            <div className="flex justify-between mt-3 px-1">
-              {['Name', 'Strategy', 'Assets', 'Settings'].map((label, index) => (
-                <div
-                  key={label}
-                  className={cn(
-                    "text-[10px] font-medium transition-colors",
-                    currentStep > index + 1
-                      ? "text-white/80"
-                      : currentStep === index + 1
-                        ? "text-white font-bold"
-                        : "text-white/35"
-                  )}
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Step Content */}
-          <div className="min-h-[400px] relative overflow-hidden">
-            <AnimatePresence mode="wait" custom={stepDirection}>
-              {/* Step 1: Agent Name */}
-              {currentStep === 1 && (
-                <motion.div
-                  key="edit-step-1"
-                  custom={stepDirection}
-                  initial={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? 100 : -100
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? -100 : 100
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    ease: [0.4, 0, 0.2, 1]
-                  }}
-                  className="space-y-4"
-                >
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step1Title')}</h3>
-                    <p className="text-sm text-white/60 mb-4">{t('step1Description')}</p>
-                  </div>
-                  <Input
-                    placeholder={t('agentNamePlaceholder')}
-                    value={agentName}
-                    onChange={(e) => setAgentName(e.target.value)}
-                    className="text-lg p-6"
-                  />
-                </motion.div>
-              )}
-
-              {/* Step 2: Template or Prompt */}
-              {currentStep === 2 && (
-                <motion.div
-                  key="edit-step-2"
-                  custom={stepDirection}
-                  initial={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? 100 : -100
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? -100 : 100
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    ease: [0.4, 0, 0.2, 1]
-                  }}
-                  className="space-y-4"
-                >
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step2Title')}</h3>
-                    <p className="text-sm text-white/60 mb-4">{t('step2Description')}</p>
-                  </div>
-
-                  {/* Toggle between template and custom */}
-                  <div className="flex gap-2 mb-4">
-                    <Button
-                      variant={useTemplate ? "default" : "outline"}
-                      onClick={() => setUseTemplate(true)}
-                      className="flex-1"
-                    >
-                      {t('useTemplate')}
-                    </Button>
-                    <Button
-                      variant={!useTemplate ? "default" : "outline"}
-                      onClick={() => setUseTemplate(false)}
-                      className="flex-1"
-                    >
-                      {t('customPrompt')}
-                    </Button>
-                  </div>
-
-                  {useTemplate ? (
-                    <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
-                      {purchasedTemplates.length === 0 ? (
-                        <div className="col-span-2 text-center py-8 text-muted-foreground">
-                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
-                          <p>Loading templates...</p>
-                        </div>
-                      ) : (
-                        purchasedTemplates.map((template) => (
-                          <div
-                            key={template.name}
-                            className={cn(
-                              "group relative p-4 rounded-lg cursor-pointer transition-all duration-200",
-                              selectedTemplate?.name === template.name
-                                ? "bg-white/[0.08] border-2 border-white/40 shadow-lg shadow-white/10 ring-1 ring-white/20"
-                                : "bg-white/[0.03] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.05]"
-                            )}
-                            onClick={() => handleUseTemplate(template)}
-                          >
-                            <div className="flex items-start gap-3">
-                              <div className={cn(
-                                "w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 transition-all duration-200",
-                                selectedTemplate?.name === template.name
-                                  ? "ring-2 ring-white/40 shadow-lg"
-                                  : "ring-1 ring-white/10 group-hover:ring-white/20"
-                              )}>
-                                {template.image ? (
-                                  <Image
-                                    src={template.image}
-                                    alt={template.name}
-                                    width={48}
-                                    height={48}
-                                    className="w-full h-full object-cover"
-                                  />
-                                ) : (
-                                  <FileText className="w-5 h-5 text-white/60" />
-                                )}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-start justify-between gap-2">
-                                  <h4 className={cn(
-                                    "font-semibold text-sm truncate capitalize transition-colors duration-200",
-                                    selectedTemplate?.name === template.name ? "text-white" : "text-white/70 group-hover:text-white/90"
-                                  )}>{template.name}</h4>
-                                  {selectedTemplate?.name === template.name && (
-                                    <div className="flex-shrink-0">
-                                      <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md">
-                                        <Check className="w-3 h-3 text-black stroke-[3]" />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                                <p className={cn(
-                                  "text-xs line-clamp-2 mt-1 transition-colors duration-200",
-                                  selectedTemplate?.name === template.name ? "text-white/60" : "text-white/40 group-hover:text-white/50"
-                                )}>{template.description || 'Trading strategy template'}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  ) : (
-                    <textarea
-                      placeholder={t('customPromptPlaceholder')}
-                      value={customPrompt}
-                      onChange={(e) => setCustomPrompt(e.target.value)}
-                      className="w-full h-48 p-4 rounded-lg border-2 border-black/10 focus:border-black/30 transition-all outline-none resize-none"
-                    />
-                  )}
-                </motion.div>
-              )}
-
-              {/* Step 3: Assets */}
-              {currentStep === 3 && (
-                <motion.div
-                  key="edit-step-3"
-                  custom={stepDirection}
-                  initial={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? 100 : -100
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? -100 : 100
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    ease: [0.4, 0, 0.2, 1]
-                  }}
-                  className="space-y-4"
-                >
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step3Title')}</h3>
-                    <p className="text-sm text-white/60 mb-4">{t('step3Description')}</p>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-3 max-h-[420px] overflow-y-auto pr-2">
-                    {cryptoAssets.map((asset) => {
-                      const isSelected = selectedAssets.includes(asset.id)
-                      return (
-                        <div
-                          key={asset.id}
-                          className={cn(
-                            "group relative p-3.5 rounded-lg cursor-pointer transition-all duration-200 flex flex-col items-center justify-center text-center",
-                            isSelected
-                              ? "bg-white/[0.08] border-2 border-white/40 shadow-lg shadow-white/10 ring-1 ring-white/20"
-                              : "bg-white/[0.03] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.05]"
-                          )}
-                          onClick={() => {
-                            if (isSelected) {
-                              setSelectedAssets(selectedAssets.filter(id => id !== asset.id))
-                            } else {
-                              setSelectedAssets([...selectedAssets, asset.id])
-                            }
-                          }}
-                        >
-                          {isSelected && (
-                            <div className="absolute -top-1.5 -right-1.5">
-                              <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-lg">
-                                <Check className="w-3 h-3 text-black stroke-[3]" />
-                              </div>
-                            </div>
-                          )}
-                          <div className={cn(
-                            "w-11 h-11 rounded-lg flex items-center justify-center mb-2.5 p-2 transition-all duration-200",
-                            isSelected
-                              ? "bg-white/10 ring-1 ring-white/20"
-                              : "bg-white/[0.05] group-hover:bg-white/10"
-                          )}>
-                            <img
-                              src={getCryptoIconUrl(asset.symbol)}
-                              alt={asset.name}
-                              className="w-full h-full object-contain"
-                              onError={(e) => {
-                                // Fallback if image fails to load
-                                e.currentTarget.style.display = 'none'
-                              }}
-                            />
-                          </div>
-                          <div className="w-full">
-                            <div className={cn(
-                              "font-semibold text-xs mb-0.5 transition-colors duration-200",
-                              isSelected ? "text-white" : "text-white/70 group-hover:text-white/90"
-                            )}>{asset.id}</div>
-                            <div className={cn(
-                              "text-[10px] transition-colors duration-200 line-clamp-1",
-                              isSelected ? "text-white/60" : "text-white/40 group-hover:text-white/50"
-                            )}>
-                              {asset.name}
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Step 4: Settings */}
-              {currentStep === 4 && (
-                <motion.div
-                  key="edit-step-4"
-                  custom={stepDirection}
-                  initial={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? 100 : -100
-                  }}
-                  animate={{
-                    opacity: 1,
-                    x: 0
-                  }}
-                  exit={{
-                    opacity: 0,
-                    x: stepDirection === 'forward' ? -100 : 100
-                  }}
-                  transition={{
-                    duration: 0.3,
-                    ease: [0.4, 0, 0.2, 1]
-                  }}
-                  className="space-y-4"
-                >
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2 text-white">Final Settings</h3>
-                    <p className="text-sm text-white/60 mb-4">Configure leverage and review settings</p>
-                  </div>
-
-                  <div className="space-y-4">
-                    {/* Leverage Settings */}
-                    <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between mb-5">
-                        <h4 className="font-semibold text-white/80">
-                          Leverage
-                        </h4>
-                        <div className="flex items-center gap-3">
-                          <span className="text-3xl font-bold text-white tabular-nums">{leverage}x</span>
-                          <div className={`px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide uppercase ${leverage <= 5
-                            ? 'bg-white/5 text-white/50 border border-white/10'
-                            : leverage <= 10
-                              ? 'bg-white/8 text-white/60 border border-white/15'
-                              : 'bg-white/12 text-white/70 border border-white/20'
-                            }`}>
-                            {leverage <= 5 ? 'Safe' : leverage <= 10 ? 'Medium' : 'High'}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div className="relative pt-2 pb-3">
-                          <input
-                            type="range"
-                            min="1"
-                            max="20"
-                            step="1"
-                            value={leverage}
-                            onChange={(e) => setLeverage(Number(e.target.value))}
-                            className="w-full h-2.5 rounded-full appearance-none cursor-grab active:cursor-grabbing slider-thumb"
-                            style={{
-                              background: `linear-gradient(to right, 
-                                rgba(255, 255, 255, 0.08) 0%, 
-                                rgba(255, 255, 255, 0.15) ${(leverage / 20) * 50}%, 
-                                rgba(255, 255, 255, 0.22) ${(leverage / 20) * 100}%)`
-                            }}
-                          />
-                          <div className="flex justify-between text-[10px] font-medium text-white/40 mt-2 px-0.5">
-                            <span>1x</span>
-                            <span>5x</span>
-                            <span>10x</span>
-                            <span>15x</span>
-                            <span>20x</span>
-                          </div>
-                        </div>
-
-                        {/* Quick Select Buttons */}
-                        <div className="grid grid-cols-5 gap-2">
-                          {[1, 3, 5, 10, 20].map((lev) => (
-                            <button
-                              key={lev}
-                              type="button"
-                              onClick={() => setLeverage(lev)}
-                              className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${leverage === lev
-                                ? 'bg-white text-black shadow-sm'
-                                : 'bg-white/[0.05] text-white/50 hover:bg-white/[0.08] hover:text-white/70 border border-white/[0.08]'
-                                }`}
-                            >
-                              {lev}x
-                            </button>
-                          ))}
-                        </div>
-
-                        <div className="flex items-start gap-2.5 p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-lg">
-                          <span className="text-white/40 text-xs mt-0.5">ℹ️</span>
-                          <p className="text-[11px] text-white/60 leading-relaxed">
-                            <strong className="font-semibold text-white/70">Risk Notice:</strong> Higher leverage multiplies both gains and losses.
-                            {leverage > 10 ? ' You selected high leverage — trade carefully.' : ' Lower leverage is safer for most traders.'}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Summary */}
-                    <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <h4 className="font-semibold mb-3 text-white">{t('summary')}</h4>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-white/60">{t('agentName')}:</span>
-                          <span className="font-medium text-white">{agentName}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-white/60">{t('template')}:</span>
-                          <span className="font-medium capitalize text-white">
-                            {useTemplate ? selectedTemplate?.name : t('customStrategy')}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-white/60">{t('assets')}:</span>
-                          <span className="font-medium text-white">{selectedAssets.join(', ')}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-white/60">Leverage:</span>
-                          <span className="font-medium text-white">{leverage}x</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-white/60">Margin:</span>
-                          <span className="font-medium text-white">Isolated</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-
-          {/* Navigation Buttons */}
-          <div className="flex items-center justify-between gap-3 pt-6 border-t">
-            <Button
-              variant="outline"
-              onClick={prevStep}
-              disabled={currentStep === 1}
-              className="gap-2"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              {t('previous')}
-            </Button>
-
-            <div className="flex-1" />
-
-            {currentStep < totalSteps ? (
-              <Button
-                onClick={nextStep}
-                disabled={!canProceed()}
-                className="gap-2 bg-white text-black hover:bg-white/90 font-medium"
-              >
-                {t('next')}
-                <ChevronRight className="w-4 h-4" />
-              </Button>
-            ) : (
-              <Button
-                onClick={handleUpdateAgent}
-                disabled={!canProceed() || isCreating}
-                className="gap-2 bg-white text-black hover:bg-white/90 font-semibold shadow-lg"
-              >
-                {isCreating ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Updating...
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-4 h-4" />
-                    Update Agent
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-
+        }}
+        getCryptoIconUrl={getCryptoIconUrl}
+        t={t}
+      />
       {/* Templates Modal */}
-      <Dialog open={isTemplatesModalOpen} onOpenChange={setIsTemplatesModalOpen}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto bg-black border-white/20">
-          <DialogHeader>
-            <DialogTitle className="text-2xl text-white">{t('purchasedTemplates')}</DialogTitle>
-            <DialogDescription className="text-white/60">
-              {t('purchasedTemplatesDescription')}
-            </DialogDescription>
-          </DialogHeader>
+      <TemplatesModal
+        isOpen={isTemplatesModalOpen}
+        onClose={() => setIsTemplatesModalOpen(false)}
+        isLoading={isLoadingTemplates}
+        templates={purchasedTemplates}
+        onSelectTemplate={(template) => {
+          setSelectedTemplate(template)
+          setUseTemplate(true)
+          setIsCreateModalOpen(true)
+        }}
+        t={t}
+      />
 
-          {isLoadingTemplates ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-white/60" />
-            </div>
-          ) : purchasedTemplates.length === 0 ? (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">📦</div>
-              <h3 className="text-xl font-semibold text-white mb-2">{t('noTemplates')}</h3>
-              <p className="text-white/60 mb-6">{t('noTemplatesDescription')}</p>
-              <Button
-                onClick={() => {
-                  setIsTemplatesModalOpen(false)
-                  router.push(`/${locale}/marketplace`)
-                }}
-                className="bg-white text-black hover:bg-white/90"
-              >
-                {t('browseMarketplace')}
-              </Button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {purchasedTemplates.map((template) => (
-                <div
-                  key={template.name}
-                  className="group p-5 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 transition-all duration-300"
-                >
-                  {/* Template Header */}
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="w-14 h-14 rounded-xl overflow-hidden flex items-center justify-center flex-shrink-0 ring-1 ring-white/20 shadow-lg">
-                      {template.image ? (
-                        <Image
-                          src={template.image}
-                          alt={template.name}
-                          width={56}
-                          height={56}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <FileText className="w-7 h-7 text-white/60" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-white mb-1 line-clamp-1 capitalize">
-                        {template.name}
-                      </h3>
-                      <p className="text-sm text-white/60 line-clamp-2">
-                        {template.description || 'Trading strategy template'}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Action Button */}
-                  <Button
-                    onClick={() => handleUseTemplate(template)}
-                    className="w-full bg-white text-black hover:bg-white/90 transition-all"
-                    size="sm"
-                  >
-                    {t('useTemplate')}
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Prompt Update Modal */}
+      <PromptUpdateModal
+        isOpen={isPromptModalOpen}
+        onClose={() => setIsPromptModalOpen(false)}
+        agentId={editingPromptAgentId}
+        currentPrompt={editingPromptCurrent}
+      />
 
       {/* Deposit Funds Modal */}
-      <Dialog open={isDepositModalOpen} onOpenChange={setIsDepositModalOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-black border border-white/[0.08] w-[95vw] sm:w-full backdrop-blur-sm">
-          <DialogHeader className="pb-4 border-b border-white/[0.06]">
-            <DialogTitle className="text-xl sm:text-2xl font-semibold text-white">
-              Fund Your Trading Account
-            </DialogTitle>
-            <DialogDescription className="text-sm text-white/40 mt-2">
-              Deposit USDC to your Hyperliquid wallet to start trading
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-6 pt-6">
-            {/* Wallet Address Section */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-white/60">Wallet Address</h3>
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 p-3 bg-white/[0.02] border border-white/[0.06] rounded-lg hover:bg-white/[0.03] hover:border-white/[0.08] transition-all">
-                <code className="flex-1 text-xs sm:text-sm text-white/80 font-mono break-all">
-                  {depositWalletAddress}
-                </code>
-                <Button
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(depositWalletAddress)
-                    alert('✅ Wallet address copied!')
-                  }}
-                  className="w-full sm:w-auto shrink-0 bg-white text-black hover:bg-white/90 h-8 px-3 text-xs"
-                >
-                  Copy
-                </Button>
-              </div>
-            </div>
-
-            {/* QR Code Section */}
-            <div className="flex flex-col items-center space-y-3 py-4">
-              <h3 className="text-sm font-medium text-white/60">Scan QR Code</h3>
-              <div className="p-4 bg-white rounded-lg">
-                <QRCodeSVG
-                  value={depositWalletAddress}
-                  size={180}
-                  level="H"
-                  includeMargin={true}
-                  className="w-[180px] h-[180px]"
-                />
-              </div>
-            </div>
-
-            {/* Deposit Instructions */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-medium text-white/60">How to Deposit</h3>
-              <div className="space-y-2">
-                <div className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-lg">
-                  <div className="shrink-0 w-6 h-6 flex items-center justify-center bg-white/[0.08] rounded text-white text-xs font-semibold">
-                    1
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-white font-medium mb-0.5">Direct Transfer</p>
-                    <p className="text-xs text-white/50">
-                      Send USDC to the wallet address above on Arbitrum network
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-lg">
-                  <div className="shrink-0 w-6 h-6 flex items-center justify-center bg-white/[0.08] rounded text-white text-xs font-semibold">
-                    2
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-white font-medium mb-0.5">Bridge</p>
-                    <p className="text-xs text-white/50">
-                      Use{' '}
-                      <a
-                        href="https://app.hyperliquid.xyz/bridge"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-white/80 hover:text-white underline"
-                      >
-                        Hyperliquid Bridge
-                      </a>
-                      {' '}to transfer USDC from other chains
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 bg-white/[0.02] border border-white/[0.06] rounded-lg">
-                  <div className="shrink-0 w-6 h-6 flex items-center justify-center bg-white/[0.08] rounded text-white text-xs font-semibold">
-                    3
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-white font-medium mb-0.5">CEX Withdrawal</p>
-                    <p className="text-xs text-white/50">
-                      Withdraw USDC from centralized exchanges (Binance, Coinbase, etc.)
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Important Notes */}
-            <div className="p-4 bg-white/[0.02] border border-white/[0.06] rounded-lg">
-              <h4 className="text-sm font-medium text-white/80 mb-2 flex items-center gap-2">
-                ⚠️ Important
-              </h4>
-              <ul className="text-xs text-white/50 space-y-1.5">
-                <li>• Only send USDC on <strong className="text-white/70">Arbitrum network</strong></li>
-                <li>• Do not send any other tokens or coins</li>
-                <li>• Minimum deposit: <strong className="text-white/70">$10 USDC</strong> recommended</li>
-                <li>• Trading will start automatically once funds are detected</li>
-              </ul>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row gap-2 pt-2">
-              <Button
-                onClick={() => setIsDepositModalOpen(false)}
-                variant="outline"
-                className="flex-1 bg-white/[0.03] text-white/60 hover:text-white hover:bg-white/[0.05] border-white/[0.08] h-9"
-              >
-                Skip for Now
-              </Button>
-              <Button
-                onClick={() => setIsDepositModalOpen(false)}
-                className="flex-1 bg-white text-black hover:bg-white/90 h-9 font-medium"
-              >
-                I've Deposited
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <DepositModal
+        isOpen={isDepositModalOpen}
+        onClose={() => setIsDepositModalOpen(false)}
+        walletAddress={depositWalletAddress}
+        currentBalance={depositCurrentBalance}
+        requiredBalance={depositRequiredBalance}
+        isCheckingBalance={isCheckingBalance}
+        onStartTrader={async () => {
+          setIsDepositModalOpen(false)
+          await handleStartStopTrader(createdTraderId, 'start')
+        }}
+        onRefreshBalance={() => {
+          if (createdTraderId) {
+            fetch(`/api/go/trade/account-balance/${createdTraderId}`, {
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+            })
+              .then(res => res.json())
+              .then(data => {
+                setDepositCurrentBalance(data.available_balance || 0)
+                // Also update required balance if available
+                if (data.initial_balance) {
+                  setDepositRequiredBalance(data.initial_balance)
+                }
+              })
+              .catch(err => console.error('Failed to refresh balance:', err))
+          }
+        }}
+      />
 
       {/* Withdraw Funds Modal */}
-      <Dialog open={isWithdrawModalOpen} onOpenChange={setIsWithdrawModalOpen}>
-        <DialogContent className="max-w-md bg-black border border-white/[0.08] w-[95vw] sm:w-full backdrop-blur-sm">
-          <DialogHeader className="pb-4 border-b border-white/[0.06]">
-            <DialogTitle className="text-xl sm:text-2xl font-semibold text-white">
-              Withdraw Funds
-            </DialogTitle>
-            <DialogDescription className="text-sm text-white/40 mt-2">
-              Withdraw USDC from your trading agent
-            </DialogDescription>
-          </DialogHeader>
+      <WithdrawModal
+        isOpen={isWithdrawModalOpen}
+        onClose={() => setIsWithdrawModalOpen(false)}
+        withdrawAmount={withdrawAmount}
+        withdrawAddress={withdrawAddress}
+        isWithdrawing={isWithdrawing}
+        onAmountChange={setWithdrawAmount}
+        onAddressChange={setWithdrawAddress}
+        onWithdraw={handleWithdraw}
+      />
 
-          <div className="space-y-6 pt-6">
-            {/* Amount Input */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-white/60">
-                Amount (USDC)
-              </label>
-              <Input
-                type="number"
-                placeholder="0.00"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value)}
-                className="bg-white/[0.02] border-white/[0.06] text-white placeholder:text-white/30 focus:border-white/[0.12] h-12 text-lg"
-                min="0"
-                step="0.01"
-                disabled={isWithdrawing}
-              />
-              <p className="text-xs text-white/40">
-                Enter the amount of USDC you want to withdraw
-              </p>
-            </div>
-
-            {/* Destination Address Input */}
-            <div className="space-y-3">
-              <label className="text-sm font-medium text-white/60">
-                Destination Address
-              </label>
-              <Input
-                type="text"
-                placeholder="0x..."
-                value={withdrawAddress}
-                onChange={(e) => setWithdrawAddress(e.target.value)}
-                className="bg-white/[0.02] border-white/[0.06] text-white placeholder:text-white/30 focus:border-white/[0.12] h-12 font-mono text-sm"
-                disabled={isWithdrawing}
-              />
-              <p className="text-xs text-white/40">
-                Enter the wallet address to receive the funds (Arbitrum network)
-              </p>
-            </div>
-
-            {/* Warning Notice */}
-            <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-              <div className="text-amber-500 mt-0.5">⚠️</div>
-              <div className="flex-1 space-y-1">
-                <p className="text-sm text-amber-200 font-medium">Important</p>
-                <p className="text-xs text-amber-200/70">
-                  Double-check the destination address. Transactions cannot be reversed.
-                  Make sure the address is on the Arbitrum network.
-                </p>
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-3 pt-4">
-              <Button
-                onClick={() => setIsWithdrawModalOpen(false)}
-                variant="outline"
-                className="flex-1 bg-transparent border-white/[0.12] text-white hover:bg-white/[0.05] h-11"
-                disabled={isWithdrawing}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleWithdraw}
-                disabled={isWithdrawing || !withdrawAmount || !withdrawAddress}
-                className="flex-1 bg-amber-500 text-white hover:bg-amber-600 h-11 font-medium"
-              >
-                {isWithdrawing ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Withdrawing...
-                  </>
-                ) : (
-                  'Confirm Withdrawal'
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Start/Stop Trader Confirmation Modal */}
+      <StartStopModal
+        isOpen={isStartStopModalOpen}
+        onClose={() => setIsStartStopModalOpen(false)}
+        action={startStopAction}
+        agent={agents.find(a => a.id === startStopAgentId) || null}
+        isLoading={isStartingStoppingTrader}
+        onConfirm={confirmStartStopTrader}
+      />
 
       {/* AI Trading Tutor */}
       <PulsingCircle />

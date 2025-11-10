@@ -1023,6 +1023,8 @@
     "next": "Next",
     "stepIndicator": "Step {current} of {total}",
     "creating": "Creating...",
+    "updateAgent": "Update Agent",
+    "updating": "Updating...",
     "purchasedTemplates": "Purchased Templates",
     "purchasedTemplatesDescription": "Select a template to create a new trading agent",
     "noTemplates": "No Templates Yet",

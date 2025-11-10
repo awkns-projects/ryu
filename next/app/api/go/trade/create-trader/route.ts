@@ -49,10 +49,10 @@ export async function POST(request: NextRequest) {
     })
 
     // ====================================
-    // 🔐 STEP 1: Auto-create DeepSeek AI Model if needed
+    // 🔐 STEP 1: Auto-find/create DeepSeek AI Model
     // ====================================
-    let aiModelId = body.ai_model_id || 'deepseek'
-    console.log(`🔍 Checking if AI model '${aiModelId}' exists...`)
+    let aiModelId = 'deepseek' // Always default to DeepSeek
+    console.log(`🔍 Searching for DeepSeek AI model...`)
 
     // Check if AI model exists (use /api/models endpoint)
     const aiModelsResponse = await fetch(`${BACKEND_URL}/api/models`, {
@@ -69,28 +69,28 @@ export async function POST(request: NextRequest) {
       console.log(`📊 AI models data:`, aiModelsData)
 
       // Response is an array directly, not wrapped in an object
-      // First check if there's an AI model with this exact ID
+      // ALWAYS search for DeepSeek by provider first (most reliable)
       let existingModel = Array.isArray(aiModelsData)
-        ? aiModelsData.find((m: any) => m.id === aiModelId)
+        ? aiModelsData.find((m: any) => m.provider === 'deepseek' || m.provider === 'DeepSeek')
         : null
 
-      // If not found by exact ID, try to find by provider (e.g., "deepseek")
-      if (!existingModel && aiModelId === 'deepseek') {
+      // If not found by provider, try exact ID match as fallback
+      if (!existingModel) {
         existingModel = Array.isArray(aiModelsData)
-          ? aiModelsData.find((m: any) => m.provider === 'deepseek')
+          ? aiModelsData.find((m: any) => m.id === 'deepseek' || m.id === 'DeepSeek')
           : null
-
-        if (existingModel) {
-          // Use the existing model's actual ID
-          aiModelId = existingModel.id
-          console.log(`✓ Found existing DeepSeek model with ID: ${aiModelId}`)
-        }
       }
 
-      console.log(`🔎 AI model '${aiModelId}' exists:`, !!existingModel)
+      if (existingModel) {
+        // Use the existing model's actual ID
+        aiModelId = existingModel.id
+        console.log(`✅ Found existing DeepSeek model with ID: ${aiModelId}`)
+      }
+
+      console.log(`🔎 DeepSeek AI model found:`, !!existingModel)
 
       if (!existingModel) {
-        console.log(`💡 AI model '${aiModelId}' not found, creating...`)
+        console.log(`💡 DeepSeek AI model not found, creating...`)
 
         // Get DeepSeek API key from environment
         const deepseekApiKey = process.env.DEEPSEEK_API_KEY
@@ -106,7 +106,7 @@ export async function POST(request: NextRequest) {
         try {
           const { updateAIModelConfig } = await import('@/lib/go-crypto')
 
-          await updateAIModelConfig(authHeader, aiModelId, {
+          await updateAIModelConfig(authHeader, 'deepseek', {
             enabled: true,
             api_key: deepseekApiKey,
             custom_api_url: '',
@@ -126,12 +126,12 @@ export async function POST(request: NextRequest) {
           if (refreshedResponse.ok) {
             const refreshedData = await refreshedResponse.json()
             const createdModel = Array.isArray(refreshedData)
-              ? refreshedData.find((m: any) => m.provider === 'deepseek')
+              ? refreshedData.find((m: any) => m.provider === 'deepseek' || m.provider === 'DeepSeek')
               : null
 
             if (createdModel) {
               aiModelId = createdModel.id
-              console.log(`✅ Using created AI model ID: ${aiModelId}`)
+              console.log(`✅ Using created DeepSeek AI model ID: ${aiModelId}`)
             }
           }
         } catch (error) {
@@ -142,53 +142,69 @@ export async function POST(request: NextRequest) {
           )
         }
       } else {
-        console.log(`✓ AI model '${aiModelId}' already exists`)
+        console.log(`✅ DeepSeek AI model already exists with ID: ${aiModelId}`)
       }
     }
 
     // ====================================
-    // 🔐 STEP 2: Auto-generate NEW Hyperliquid wallet for EACH trader
+    // 🔐 STEP 2: Ensure Hyperliquid exchange exists
     // ====================================
     let walletAddress = ''
     let isNewWallet = false
-    let uniqueExchangeId = body.exchange_id // Default to the original exchange_id
 
     if (body.exchange_id === 'hyperliquid') {
-      console.log('🔑 Hyperliquid exchange detected, generating NEW wallet for this trader...')
+      console.log('🔑 Hyperliquid exchange detected, checking if it exists...')
 
-      // ALWAYS generate a new wallet for each trader
-      const wallet = generateEthereumWallet()
-      console.log('✅ New wallet generated for trader:', wallet.address)
+      // Check if Hyperliquid exchange already exists
+      const exchangesResponse = await fetch(`${BACKEND_URL}/api/exchanges`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': authHeader,
+        },
+      })
 
-      walletAddress = wallet.address
-      isNewWallet = true
+      if (exchangesResponse.ok) {
+        const exchangesData = await exchangesResponse.json()
+        const existingHyperliquid = Array.isArray(exchangesData)
+          ? exchangesData.find((ex: any) => ex.id === 'hyperliquid')
+          : null
 
-      // Create a unique exchange ID for this trader (hyperliquid_<timestamp>)
-      const timestamp = Math.floor(Date.now() / 1000)
-      uniqueExchangeId = `hyperliquid_${timestamp}`
-      console.log(`🆔 Creating new exchange entry with ID: ${uniqueExchangeId}`)
+        if (existingHyperliquid) {
+          console.log(`✅ Using existing Hyperliquid exchange`)
+          walletAddress = existingHyperliquid.hyperliquid_wallet_addr || ''
+        } else {
+          console.log('💡 Hyperliquid exchange not found, creating it...')
 
-      // Create NEW Hyperliquid exchange config with unique ID
-      try {
-        const { updateExchangeConfig } = await import('@/lib/go-crypto')
+          // Generate a new wallet
+          const wallet = generateEthereumWallet()
+          console.log('✅ New wallet generated:', wallet.address)
 
-        await updateExchangeConfig(authHeader, uniqueExchangeId, {
-          enabled: true,
-          api_key: wallet.privateKey,
-          secret_key: '',
-          testnet: false,
-          hyperliquid_wallet_addr: wallet.address,
-        })
+          walletAddress = wallet.address
+          isNewWallet = true
 
-        console.log(`✅ New Hyperliquid exchange created: ${uniqueExchangeId}`)
-        console.log(`💰 Wallet address: ${wallet.address}`)
-        console.log(`💰 IMPORTANT: Please fund wallet ${wallet.address} with USDC to start trading`)
-      } catch (error) {
-        console.error('❌ Failed to create Hyperliquid exchange:', error)
-        return NextResponse.json(
-          { error: `Failed to create Hyperliquid exchange: ${error instanceof Error ? error.message : 'Unknown error'}` },
-          { status: 500 }
-        )
+          // Create Hyperliquid exchange config
+          try {
+            const { updateExchangeConfig } = await import('@/lib/go-crypto')
+
+            await updateExchangeConfig(authHeader, 'hyperliquid', {
+              enabled: true,
+              api_key: wallet.privateKey,
+              secret_key: '',
+              testnet: false,
+              hyperliquid_wallet_addr: wallet.address,
+            })
+
+            console.log(`✅ Hyperliquid exchange created`)
+            console.log(`💰 Wallet address: ${wallet.address}`)
+            console.log(`💰 IMPORTANT: Please fund wallet ${wallet.address} with USDC to start trading`)
+          } catch (error) {
+            console.error('❌ Failed to create Hyperliquid exchange:', error)
+            return NextResponse.json(
+              { error: `Failed to create Hyperliquid exchange: ${error instanceof Error ? error.message : 'Unknown error'}` },
+              { status: 500 }
+            )
+          }
+        }
       }
     }
 
@@ -200,7 +216,7 @@ export async function POST(request: NextRequest) {
     const goBackendPayload = {
       ...body,
       ai_model_id: aiModelId, // Ensure we use the correct AI model ID
-      exchange_id: uniqueExchangeId, // Use the unique exchange ID if generated
+      exchange_id: body.exchange_id, // Always use the original exchange_id (e.g., 'hyperliquid')
     }
 
     console.log('📦 [API Route] COMPLETE payload being sent to Go backend (POST /api/traders):')

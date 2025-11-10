@@ -1,47 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getDatabase } from '@/lib/db'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
-interface BackendPosition {
-  trader_id: string
-  trader_name: string
-  symbol: string
-  side: string
-  entry_price: number
-  mark_price: number
-  quantity: number
-  leverage: number
-  unrealized_pnl: number
-  unrealized_pnl_pct: number
-  liquidation_price?: number
-  margin_used?: number
-}
-
-interface ActivePosition {
-  id: string
-  agentId: string
-  agentName: string
-  asset: string
-  type: 'Long' | 'Short'
-  size: number
-  leverage: string
-  entryPrice: number
-  currentPrice: number
-  pnl: number
-  roi: number
-}
-
 export async function GET(request: NextRequest) {
-  try {
-    // Try to fetch from new backend endpoint
-    const response = await fetch(`${BACKEND_URL}/api/positions/all`, {
-      cache: 'no-store',
-      next: { revalidate: 10 }
-    })
+  const db = getDatabase()
+  console.log('[Positions] Fetching positions for running traders')
 
-    if (!response.ok) {
-      // Backend endpoint doesn't exist yet - return empty with message
-      console.warn('Positions endpoint /api/positions/all not available yet')
+  try {
+    // 1. Get all running traders from SQLite
+    const traders = db.prepare(`
+      SELECT 
+        t.id,
+        t.name,
+        t.user_id,
+        t.exchange_id,
+        e.name as exchange_name,
+        e.type as exchange_type
+      FROM traders t
+      LEFT JOIN exchanges e ON t.exchange_id = e.id
+      WHERE t.is_running = 1
+      LIMIT 50
+    `).all() as any[]
+
+    if (traders.length === 0) {
+      console.log('[Positions] No running traders found')
       return NextResponse.json({
         positions: [],
         totalCount: 0,
@@ -49,68 +32,90 @@ export async function GET(request: NextRequest) {
         avgLeverage: 0,
         avgRoi: 0,
         lastUpdated: new Date().toISOString(),
-        message: 'Positions data will be available soon. Backend endpoint pending implementation.'
-      })
+        message: 'No running traders'
+      }, { status: 200 })
     }
 
-    const data = await response.json()
+    console.log(`[Positions] Found ${traders.length} running traders`)
 
-    // Transform to ActivePosition format
-    const positions: ActivePosition[] = data.positions.map((pos: BackendPosition) => ({
-      id: `${pos.trader_id}-${pos.symbol}`,
-      agentId: pos.trader_id,
-      agentName: pos.trader_name,
-      asset: extractAssetName(pos.symbol),
-      type: pos.side === 'BUY' ? 'Long' : 'Short',
-      size: pos.quantity,
-      leverage: `${pos.leverage}x`,
-      entryPrice: pos.entry_price,
-      currentPrice: pos.mark_price,
-      pnl: pos.unrealized_pnl,
-      roi: pos.unrealized_pnl_pct
-    }))
+    // 2. Fetch positions for each trader from Go API
+    const positionsPromises = traders.map(async (trader) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/positions?trader_id=${trader.id}`, {
+          cache: 'no-store'
+        })
 
-    // Calculate aggregated stats
-    const totalValue = positions.reduce((sum, p) => sum + (p.size * p.currentPrice), 0)
-    const avgLeverage = positions.length > 0
-      ? positions.reduce((sum, p) => sum + parseInt(p.leverage), 0) / positions.length
+        if (!res.ok) {
+          console.warn(`[Positions] Failed to fetch for trader ${trader.id}: ${res.status}`)
+          return []
+        }
+
+        const positions = await res.json()
+
+        // Transform to frontend format
+        return positions.map((p: any) => {
+          const roiPct = p.entry_price && p.entry_price > 0 ?
+            ((p.mark_price - p.entry_price) / p.entry_price * 100) *
+            (p.side === 'BUY' || p.side === 'LONG' ? 1 : -1) : 0
+
+          return {
+            id: `${trader.id}-${p.symbol}`,
+            agentId: trader.id,
+            agentName: trader.name,
+            asset: p.symbol?.replace(/USDT$|PERP$|USD$/i, ''),
+            type: (p.side === 'BUY' || p.side === 'LONG') ? 'Long' : 'Short',
+            size: Math.abs(p.position_amt || p.quantity || 0),
+            leverage: `${p.leverage || 1}x`,
+            entryPrice: p.entry_price || 0,
+            currentPrice: p.mark_price || 0,
+            pnl: p.unrealized_pnl || 0,
+            roi: roiPct,
+            exchange: trader.exchange_name || trader.exchange_id
+          }
+        })
+      } catch (error) {
+        console.error(`[Positions] Error fetching for trader ${trader.id}:`, error)
+        return []
+      }
+    })
+
+    const allPositions = (await Promise.all(positionsPromises)).flat()
+
+    // 3. Calculate aggregated stats
+    const totalValue = allPositions.reduce((sum, p) => sum + (p.size * p.currentPrice), 0)
+    const totalPnL = allPositions.reduce((sum, p) => sum + p.pnl, 0)
+    const avgLeverage = allPositions.length > 0
+      ? allPositions.reduce((sum, p) => sum + parseInt(p.leverage), 0) / allPositions.length
       : 0
-    const avgRoi = positions.length > 0
-      ? positions.reduce((sum, p) => sum + p.roi, 0) / positions.length
+    const avgRoi = allPositions.length > 0
+      ? allPositions.reduce((sum, p) => sum + p.roi, 0) / allPositions.length
       : 0
+
+    console.log(`[Positions] Successfully aggregated ${allPositions.length} positions`)
 
     return NextResponse.json({
-      positions,
-      totalCount: positions.length,
+      positions: allPositions,
+      totalCount: allPositions.length,
       totalValue,
+      totalPnL,
       avgLeverage,
       avgRoi,
       lastUpdated: new Date().toISOString()
-    })
+    }, { status: 200 })
 
-  } catch (error) {
-    console.error('Positions API error:', error)
-
-    // Return empty data with error message
-    return NextResponse.json({
-      positions: [],
-      totalCount: 0,
-      totalValue: 0,
-      avgLeverage: 0,
-      avgRoi: 0,
-      lastUpdated: new Date().toISOString(),
-      message: 'Backend endpoint not available. Waiting for backend implementation.'
-    })
+  } catch (error: any) {
+    console.error('[Positions] Error in aggregation:', error)
+    return NextResponse.json(
+      {
+        positions: [],
+        totalCount: 0,
+        totalValue: 0,
+        avgLeverage: 0,
+        avgRoi: 0,
+        lastUpdated: new Date().toISOString(),
+        message: 'Failed to fetch positions: ' + error.message
+      },
+      { status: 500 }
+    )
   }
 }
-
-function extractAssetName(symbol: string): string {
-  // Remove common suffixes
-  let asset = symbol.replace(/USDT$/, '')
-  asset = asset.replace(/PERP$/, '')
-  asset = asset.replace(/USD$/, '')
-  asset = asset.replace(/-.*$/, '') // Remove anything after dash
-
-  return asset
-}
-

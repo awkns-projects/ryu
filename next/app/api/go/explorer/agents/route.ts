@@ -25,6 +25,7 @@ interface RunningAgent {
   pnl: number
   roi: number
   trades: number
+  equityHistory?: any[]
 }
 
 export async function GET(request: NextRequest) {
@@ -40,6 +41,26 @@ export async function GET(request: NextRequest) {
 
     const data = await response.json()
 
+    // Fetch equity history for all traders (for time-series charts)
+    const traderIds = data.traders.map((t: BackendTrader) => t.trader_id)
+    let equityHistories: Record<string, any[]> = {}
+
+    try {
+      const historyRes = await fetch(`${BACKEND_URL}/api/equity-history-batch`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ trader_ids: traderIds }),
+        cache: 'no-store'
+      })
+
+      if (historyRes.ok) {
+        const historyData = await historyRes.json()
+        equityHistories = historyData.histories || {}
+      }
+    } catch (error) {
+      console.warn('[Agents] Failed to fetch equity histories:', error)
+    }
+
     // Transform to RunningAgent format
     const agents: RunningAgent[] = data.traders.map((trader: BackendTrader) => ({
       id: trader.trader_id,
@@ -50,7 +71,8 @@ export async function GET(request: NextRequest) {
       deposit: trader.total_equity, // Using total_equity as proxy for initial deposit
       pnl: trader.total_pnl,
       roi: trader.total_pnl_pct,
-      trades: trader.position_count
+      trades: trader.position_count, // NOTE: This is open positions, not closed trades
+      equityHistory: equityHistories[trader.trader_id] || []
     }))
 
     // Sort by ROI descending
@@ -64,7 +86,11 @@ export async function GET(request: NextRequest) {
       totalCount: agents.length,
       activeCount,
       pausedCount,
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      _meta: {
+        tradesSource: 'open_positions',
+        historySource: Object.keys(equityHistories).length > 0 ? 'api' : 'unavailable'
+      }
     })
 
   } catch (error) {

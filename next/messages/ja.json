@@ -1023,6 +1023,8 @@
     "next": "次へ",
     "stepIndicator": "ステップ{current}/{total}",
     "creating": "作成中...",
+    "updateAgent": "エージェントを更新",
+    "updating": "更新中...",
     "purchasedTemplates": "購入済みテンプレート",
     "purchasedTemplatesDescription": "新しいトレーディングエージェントを作成するテンプレートを選択",
     "noTemplates": "テンプレートがまだありません",

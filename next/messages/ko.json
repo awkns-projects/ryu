@@ -1023,6 +1023,8 @@
     "next": "다음",
     "stepIndicator": "{total}단계 중 {current}단계",
     "creating": "생성 중...",
+    "updateAgent": "에이전트 업데이트",
+    "updating": "업데이트 중...",
     "purchasedTemplates": "구매한 템플릿",
     "purchasedTemplatesDescription": "새 거래 에이전트를 만들 템플릿 선택",
     "noTemplates": "아직 템플릿 없음",

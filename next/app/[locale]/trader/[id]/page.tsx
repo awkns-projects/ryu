@@ -5,9 +5,10 @@ import { useRouter } from "next/navigation"
 import { useLocale } from "next-intl"
 import { useGoAuth } from "@/contexts/go-auth-context"
 import useSWR from "swr"
-import { ArrowLeft, Activity, TrendingUp, Target, DollarSign, Loader2, ExternalLink } from "lucide-react"
+import { ArrowLeft, Activity, TrendingUp, Target, DollarSign, Loader2, ExternalLink, FileText, Bot, BarChart3 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import AppHeader from '@/components/app-header'
+import { DecisionLogsTab, StatisticsTab, EquityChart, AILearningTab } from '@/components/trade'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
@@ -389,6 +390,62 @@ export default function TraderDetailPage({ params }: TraderDetailProps) {
               : '📊 This trader is publicly visible on the Explorer. Live performance updates every 15 seconds.'
             }
           </p>
+        </div>
+
+        {/* Equity History Section */}
+        <div className="mt-8">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/20">
+              <Activity className="w-5 h-5 text-green-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Equity History</h2>
+              <p className="text-sm text-white/60">Track performance and equity changes over time</p>
+            </div>
+          </div>
+          <EquityChart traderId={traderId} />
+        </div>
+
+        {/* Statistics & Performance Section */}
+        <div className="mt-8">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 border border-blue-500/20">
+              <Target className="w-5 h-5 text-blue-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">Statistics & Performance</h2>
+              <p className="text-sm text-white/60">Detailed trading statistics and performance metrics</p>
+            </div>
+          </div>
+          <StatisticsTab traderId={traderId} />
+        </div>
+
+        {/* AI Learning Section */}
+        <div className="mt-8">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 border border-orange-500/20">
+              <Bot className="w-5 h-5 text-orange-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">AI Learning Insights</h2>
+              <p className="text-sm text-white/60">View AI performance analytics and learning progress</p>
+            </div>
+          </div>
+          <AILearningTab traderId={traderId} />
+        </div>
+
+        {/* Decision Logs Section */}
+        <div className="mt-8">
+          <div className="mb-4 flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500/10 to-blue-500/10 border border-purple-500/20">
+              <FileText className="w-5 h-5 text-purple-400" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">AI Decision Logs</h2>
+              <p className="text-sm text-white/60">View detailed trading decisions and AI reasoning</p>
+            </div>
+          </div>
+          <DecisionLogsTab traderId={traderId} />
         </div>
       </div>
     </div>

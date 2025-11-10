@@ -7,21 +7,28 @@ import { useSession } from "@/lib/auth-client"
 import useSWR from "swr"
 import AppHeader from '@/components/app-header'
 import PulsingCircle from '@/components/shader/pulsing-circle'
-import { Trophy, Activity, FileText, ChevronRight, Loader2, Star, Users, Target, TrendingUp, BarChart3, PieChart, ChevronLeft, Search, Filter, X, CirclePlus, CircleMinus, DollarSign } from "lucide-react"
+import { Trophy, Activity, FileText, ChevronRight, Loader2, Star, Users, Target, TrendingUp, BarChart3, PieChart, ChevronLeft, Search, Filter, X, CirclePlus, CircleMinus, DollarSign, Medal } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { ComparisonChartSection } from "@/components/explorer"
 
 // Data types
 interface LeaderboardAgent {
   id: string
   name: string
   owner: string
-  icon: string
+  model: string
+  exchange: string
+  totalEquity: number
   pnl: number
-  roi: number // Changed from pnlPercent
-  trades: number
+  pnlPct: number
+  roi: number
+  openPositions: number
+  marginUsedPct: number
   winRate: number
   volume: number
-  model: string // Added
+  icon: string
+  isRunning: boolean
+  equityHistory?: any[]
 }
 
 interface RunningAgent {
@@ -293,7 +300,8 @@ export default function ExplorerPage() {
     totalAgents: leaderboardAgents.length,
     totalVolume: leaderboardAgents.reduce((sum, agent) => sum + agent.volume, 0),
     avgWinRate: (leaderboardAgents.reduce((sum, agent) => sum + agent.winRate, 0) / leaderboardAgents.length).toFixed(1),
-    totalTrades: leaderboardAgents.reduce((sum, agent) => sum + agent.trades, 0)
+    totalOpenPositions: leaderboardAgents.reduce((sum, agent) => sum + agent.openPositions, 0),
+    leader: leaderboardAgents.length > 0 ? leaderboardAgents[0] : null
   }
 
   const agentsStats = {
@@ -650,6 +658,24 @@ export default function ExplorerPage() {
                       <p className="text-xs text-white/40 mt-0.5">{t('leaderboard.description')}</p>
                     </div>
                   </div>
+
+                  {/* Leader Spotlight */}
+                  {leaderboardStats.leader && (
+                    <div className="hidden md:flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="text-xs text-white/40 mb-1">Current Leader</div>
+                        <div className="text-base font-bold text-yellow-400">{leaderboardStats.leader.name}</div>
+                        <div className={cn(
+                          "text-sm font-semibold",
+                          leaderboardStats.leader.pnl >= 0 ? "text-green-400" : "text-red-400"
+                        )}>
+                          {leaderboardStats.leader.pnl >= 0 ? '+' : ''}{leaderboardStats.leader.pnlPct.toFixed(2)}%
+                        </div>
+                      </div>
+                      <Trophy className="w-6 h-6 text-yellow-400 animate-pulse" />
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2">
                     <select
                       value={sortBy}
@@ -658,9 +684,9 @@ export default function ExplorerPage() {
                     >
                       <option value="default" className="bg-black">Sort by P&L</option>
                       <option value="pnl" className="bg-black">P&L</option>
-                      <option value="trades" className="bg-black">Trades</option>
-                      <option value="winRate" className="bg-black">Win Rate</option>
-                      <option value="volume" className="bg-black">Volume</option>
+                      <option value="trades" className="bg-black">Open Positions</option>
+                      <option value="winRate" className="bg-black">Win Rate (est)</option>
+                      <option value="volume" className="bg-black">Volume (est)</option>
                     </select>
                   </div>
                 </div>
@@ -749,9 +775,9 @@ export default function ExplorerPage() {
                   <div className="p-3 rounded-lg bg-white/[0.02] border border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.1] transition-all">
                     <div className="flex items-center gap-1.5 mb-1.5">
                       <BarChart3 className="w-3.5 h-3.5 text-purple-400/70" />
-                      <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Total Trades</span>
+                      <span className="text-[10px] text-white/40 uppercase tracking-wider font-semibold">Open Positions</span>
                     </div>
-                    <div className="text-xl font-bold text-white tabular-nums">{leaderboardStats.totalTrades.toLocaleString()}</div>
+                    <div className="text-xl font-bold text-white tabular-nums">{leaderboardStats.totalOpenPositions.toLocaleString()}</div>
                   </div>
                 </div>
 
@@ -775,12 +801,25 @@ export default function ExplorerPage() {
 
                       {/* Generate and draw lines for top 3 agents */}
                       {leaderboardAgents.slice(0, 3).map((agent, agentIndex) => {
-                        const timeSeriesData = generateTimeSeriesData(agent.roi - 20, 3)
-                        const maxValue = Math.max(...timeSeriesData.map(d => d.value))
-                        const minValue = Math.min(...timeSeriesData.map(d => d.value))
-                        const range = maxValue - minValue
+                        // Use real equity history if available, otherwise generate mock data
+                        const timeSeriesData = agent.equityHistory && agent.equityHistory.length > 0
+                          ? agent.equityHistory.map((point: any) => ({
+                            time: new Date(point.timestamp).getTime(),
+                            value: point.total_pnl_pct || ((point.total_equity - point.balance) / point.balance * 100)
+                          }))
+                          : generateTimeSeriesData(agent.roi - 20, 3)
 
-                        const points = timeSeriesData.map((point, i) => {
+                        // Calculate range for all top 3 agents for consistent scaling
+                        const allData = leaderboardAgents.slice(0, 3).flatMap(a =>
+                          a.equityHistory && a.equityHistory.length > 0
+                            ? a.equityHistory.map((p: any) => p.total_pnl_pct || ((p.total_equity - p.balance) / p.balance * 100))
+                            : generateTimeSeriesData(a.roi - 20, 3).map(d => d.value)
+                        )
+                        const maxValue = Math.max(...allData)
+                        const minValue = Math.min(...allData)
+                        const range = Math.max(maxValue - minValue, 1) // Prevent division by zero
+
+                        const points = timeSeriesData.map((point: any, i: number) => {
                           const x = (i / (timeSeriesData.length - 1)) * 800
                           const y = 250 - ((point.value - minValue) / range) * 200 - 25
                           return `${x},${y}`
@@ -872,60 +911,106 @@ export default function ExplorerPage() {
                             <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-white/40 flex-shrink-0" />
                           </div>
 
-                          <div className="grid grid-cols-3 gap-3">
+                          <div className="grid grid-cols-4 gap-2">
+                            <div className="bg-white/[0.02] rounded-lg p-2.5 border border-white/[0.05]">
+                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold mb-1">Equity</div>
+                              <div className="text-sm font-bold text-white tabular-nums">
+                                ${agent.totalEquity.toFixed(0)}
+                              </div>
+                            </div>
                             <div className="bg-white/[0.02] rounded-lg p-2.5 border border-white/[0.05]">
                               <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold mb-1">P&L</div>
                               <div className={cn("text-sm font-bold tracking-tight tabular-nums", agent.pnl >= 0 ? "text-green-400" : "text-red-400")}>
-                                {agent.pnl >= 0 ? '+' : ''}${(agent.pnl / 1000).toFixed(1)}K
+                                {agent.pnl >= 0 ? '+' : ''}{agent.pnlPct.toFixed(2)}%
                               </div>
                               <div className={cn("text-[10px] font-medium tabular-nums", agent.pnl >= 0 ? "text-green-400/60" : "text-red-400/60")}>
-                                {agent.roi >= 0 ? '+' : ''}{agent.roi.toFixed(1)}%
+                                {agent.pnl >= 0 ? '+' : ''}${agent.pnl.toFixed(2)}
                               </div>
                             </div>
                             <div className="bg-white/[0.02] rounded-lg p-2.5 border border-white/[0.05]">
-                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold mb-1">{t('leaderboard.trades')}</div>
-                              <div className="text-sm font-semibold text-white tabular-nums">{agent.trades}</div>
+                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold mb-1">Open Pos</div>
+                              <div className="text-sm font-semibold text-white tabular-nums">{agent.openPositions}</div>
+                              <div className="text-[10px] text-white/40 tabular-nums">{agent.marginUsedPct.toFixed(1)}% margin</div>
                             </div>
                             <div className="bg-white/[0.02] rounded-lg p-2.5 border border-white/[0.05]">
-                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold mb-1">{t('leaderboard.winRate')}</div>
-                              <div className="text-sm font-semibold text-white tabular-nums">{agent.winRate}%</div>
+                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold mb-1">Win Rate</div>
+                              <div className="text-sm font-semibold text-white tabular-nums">{agent.winRate.toFixed(1)}%</div>
+                              <div className="text-[10px] text-white/40">est</div>
                             </div>
                           </div>
                         </div>
 
                         {/* Desktop Layout */}
                         <div className="hidden md:flex items-center gap-4 relative z-10">
+                          {/* Rank with Medal */}
                           <div className={cn(
-                            "flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold",
-                            actualIndex === 0 ? "bg-gradient-to-br from-yellow-400/20 to-yellow-600/20 text-yellow-400 border border-yellow-400/30" :
-                              actualIndex === 1 ? "bg-gradient-to-br from-slate-300/20 to-slate-500/20 text-slate-300 border border-slate-300/30" :
-                                actualIndex === 2 ? "bg-gradient-to-br from-orange-400/20 to-orange-600/20 text-orange-400 border border-orange-400/30" :
-                                  "bg-white/[0.03] text-white/60 border border-white/[0.08]"
+                            "flex-shrink-0 w-12 h-10 rounded-lg flex items-center justify-center gap-1",
+                            actualIndex === 0 ? "bg-gradient-to-br from-yellow-400/20 to-yellow-600/20 border border-yellow-400/30" :
+                              actualIndex === 1 ? "bg-gradient-to-br from-slate-300/20 to-slate-500/20 border border-slate-300/30" :
+                                actualIndex === 2 ? "bg-gradient-to-br from-orange-400/20 to-orange-600/20 border border-orange-400/30" :
+                                  "bg-white/[0.03] border border-white/[0.08]"
                           )}>
-                            <span className="tabular-nums">{actualIndex + 1}</span>
+                            {actualIndex < 3 && (
+                              <Medal className={cn(
+                                "w-4 h-4",
+                                actualIndex === 0 ? "text-yellow-400" :
+                                  actualIndex === 1 ? "text-slate-300" :
+                                    "text-orange-400"
+                              )} />
+                            )}
+                            <span className={cn(
+                              "text-sm font-bold tabular-nums",
+                              actualIndex === 0 ? "text-yellow-400" :
+                                actualIndex === 1 ? "text-slate-300" :
+                                  actualIndex === 2 ? "text-orange-400" :
+                                    "text-white/60"
+                            )}>{actualIndex + 1}</span>
                           </div>
-                          <div className="text-2xl">{agent.icon}</div>
+
+                          {/* Agent Info */}
+                          <div className="text-xl">{agent.icon}</div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-white text-sm group-hover:text-white/90 transition-colors">{agent.name}</h3>
-                            <p className="text-xs text-white/30 mt-0.5">by {agent.owner}</p>
+                            <p className="text-xs text-white/30 mt-0.5">
+                              <span className="font-mono">{agent.model.toUpperCase()}</span> + <span className="font-mono">{agent.exchange.toUpperCase()}</span>
+                            </p>
                           </div>
+
+                          {/* Stats */}
                           <div className="flex items-center gap-6">
+                            {/* Total Equity */}
                             <div className="text-right">
-                              <div className={cn("text-lg font-bold tracking-tight tabular-nums", agent.pnl >= 0 ? "text-green-400" : "text-red-400")}>
-                                {agent.pnl >= 0 ? '+' : ''}${agent.pnl.toLocaleString()}
+                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Equity</div>
+                              <div className="text-sm font-bold text-white tabular-nums mt-0.5">
+                                ${agent.totalEquity.toFixed(0)}
+                              </div>
+                            </div>
+
+                            {/* P&L */}
+                            <div className="text-right min-w-[90px]">
+                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">P&L</div>
+                              <div className={cn("text-base font-bold tracking-tight tabular-nums", agent.pnl >= 0 ? "text-green-400" : "text-red-400")}>
+                                {agent.pnl >= 0 ? '+' : ''}{agent.pnlPct.toFixed(2)}%
                               </div>
                               <div className={cn("text-xs font-medium tabular-nums", agent.pnl >= 0 ? "text-green-400/60" : "text-red-400/60")}>
-                                {agent.roi >= 0 ? '+' : ''}{agent.roi.toFixed(2)}%
+                                {agent.pnl >= 0 ? '+' : ''}${agent.pnl.toFixed(2)}
                               </div>
                             </div>
+
+                            {/* Open Positions + Margin */}
                             <div className="text-right">
-                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">{t('leaderboard.trades')}</div>
-                              <div className="text-sm font-semibold text-white mt-0.5 tabular-nums">{agent.trades}</div>
+                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Open Pos</div>
+                              <div className="text-sm font-semibold text-white mt-0.5 tabular-nums">{agent.openPositions}</div>
+                              <div className="text-xs text-white/40 tabular-nums">{agent.marginUsedPct.toFixed(1)}%</div>
                             </div>
+
+                            {/* Win Rate */}
                             <div className="text-right">
-                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">{t('leaderboard.winRate')}</div>
-                              <div className="text-sm font-semibold text-white mt-0.5 tabular-nums">{agent.winRate}%</div>
+                              <div className="text-[10px] text-white/30 uppercase tracking-wider font-semibold">Win Rate</div>
+                              <div className="text-sm font-semibold text-white mt-0.5 tabular-nums">{agent.winRate.toFixed(1)}%</div>
+                              <div className="text-xs text-white/40">est</div>
                             </div>
+
                             <ChevronRight className="w-4 h-4 text-white/20 group-hover:text-white/40 group-hover:translate-x-0.5 transition-all" />
                           </div>
                         </div>
@@ -935,6 +1020,18 @@ export default function ExplorerPage() {
                 </div>
 
                 <Pagination type="leaderboard" data={leaderboardAgents} />
+              </div>
+
+              {/* Multi-Trader Comparison Chart */}
+              <div className="mt-8">
+                <ComparisonChartSection traders={leaderboardAgents.map(agent => ({
+                  id: agent.id,
+                  name: agent.name,
+                  totalEquity: agent.totalEquity,
+                  pnl: agent.pnl,
+                  roi: agent.roi,
+                  icon: agent.icon
+                }))} />
               </div>
             </div>
           )}
@@ -962,7 +1059,7 @@ export default function ExplorerPage() {
                       <option value="default" className="bg-black">Sort by P&L</option>
                       <option value="pnl" className="bg-black">P&L</option>
                       <option value="deposit" className="bg-black">Deposit</option>
-                      <option value="trades" className="bg-black">Trades</option>
+                      <option value="trades" className="bg-black">Open Positions</option>
                     </select>
                   </div>
                 </div>
@@ -1078,12 +1175,25 @@ export default function ExplorerPage() {
 
                       {/* Generate and draw lines for top 4 agents */}
                       {runningAgents.slice(0, 4).map((agent, agentIndex) => {
-                        const timeSeriesData = generateTimeSeriesData(agent.roi * 0.3, 2, 60)
-                        const maxValue = Math.max(...runningAgents.slice(0, 4).flatMap(() => generateTimeSeriesData(20, 2, 60).map(d => d.value)))
-                        const minValue = Math.min(...runningAgents.slice(0, 4).flatMap(() => generateTimeSeriesData(-10, 2, 60).map(d => d.value)))
-                        const range = maxValue - minValue
+                        // Use real equity history if available, otherwise generate mock data
+                        const timeSeriesData = agent.equityHistory && agent.equityHistory.length > 0
+                          ? agent.equityHistory.map((point: any) => ({
+                            time: new Date(point.timestamp).getTime(),
+                            value: point.total_pnl_pct || ((point.total_equity - point.balance) / point.balance * 100)
+                          }))
+                          : generateTimeSeriesData(agent.roi * 0.3, 2, 60)
 
-                        const points = timeSeriesData.map((point, i) => {
+                        // Calculate range for all top 4 agents for consistent scaling
+                        const allData = runningAgents.slice(0, 4).flatMap(a =>
+                          a.equityHistory && a.equityHistory.length > 0
+                            ? a.equityHistory.map((p: any) => p.total_pnl_pct || ((p.total_equity - p.balance) / p.balance * 100))
+                            : generateTimeSeriesData(a.roi * 0.3, 2, 60).map(d => d.value)
+                        )
+                        const maxValue = Math.max(...allData)
+                        const minValue = Math.min(...allData)
+                        const range = Math.max(maxValue - minValue, 1) // Prevent division by zero
+
+                        const points = timeSeriesData.map((point: any, i: number) => {
                           const x = (i / (timeSeriesData.length - 1)) * 800
                           const y = 250 - ((point.value - minValue) / range) * 200 - 25
                           return `${x},${y}`

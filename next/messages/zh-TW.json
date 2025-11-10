@@ -1025,6 +1025,8 @@
     "next": "下一步",
     "stepIndicator": "步驟 {current} / {total}",
     "creating": "建立中...",
+    "updateAgent": "更新智能體",
+    "updating": "更新中...",
     "purchasedTemplates": "已購買的模板",
     "purchasedTemplatesDescription": "選擇一個模板以建立新的交易智能體",
     "noTemplates": "尚無模板",

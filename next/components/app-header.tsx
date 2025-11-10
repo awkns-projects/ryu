@@ -9,13 +9,14 @@ import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 
 type AppHeaderProps = {
-  locale: string
+  locale?: string
   activeTab?: "home" | "trade" | "marketplace" | "explorer"
 }
 
-export default function AppHeader({ locale, activeTab = "marketplace" }: AppHeaderProps) {
+export default function AppHeader({ locale: propLocale, activeTab = "marketplace" }: AppHeaderProps) {
   const router = useRouter()
   const currentLocale = useLocale()
+  const locale = propLocale || currentLocale // Use prop locale if provided, otherwise use hook
   const t = useTranslations('marketplaceHeader')
   const [userPoints, setUserPoints] = useState<number>(0)
   const [pointsLoading, setPointsLoading] = useState(true)
