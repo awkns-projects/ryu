@@ -7,7 +7,7 @@ import { useSession } from "@/lib/auth-client"
 import useSWR from "swr"
 import AppHeader from '@/components/app-header'
 import PulsingCircle from '@/components/shader/pulsing-circle'
-import { Trophy, Activity, FileText, ChevronRight, Loader2, Star, Users, Target, TrendingUp, DollarSign, BarChart3, PieChart, ChevronLeft, Search, Filter, X } from "lucide-react"
+import { Trophy, Activity, FileText, ChevronRight, Loader2, Star, Users, Target, TrendingUp, BarChart3, PieChart, ChevronLeft, Search, Filter, X, CirclePlus, CircleMinus, DollarSign } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 // Data types
@@ -1155,12 +1155,36 @@ export default function ExplorerPage() {
                     >
                       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.02] to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
                       <div className="relative z-10">
-                        <div className="flex items-center gap-2.5 mb-2.5">
-                          <div className="text-2xl">{getModelIcon(agent.model)}</div>
+                        <div className="flex items-start gap-2.5 mb-2.5">
+                          <div className="text-2xl mt-0.5">{getModelIcon(agent.model)}</div>
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold text-white text-sm group-hover:text-white/90 transition-colors">{agent.name}</h3>
                             <p className="text-[10px] text-white/30 line-clamp-1 mt-0.5">{agent.description}</p>
                           </div>
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/[0.05] text-white/60 hover:text-green-400"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                // TODO: Handle deposit funds
+                              }}
+                              title="Deposit Funds"
+                            >
+                              <CirclePlus className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-white/[0.05] text-white/60 hover:text-amber-400"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                // TODO: Handle withdraw funds
+                              }}
+                              title="Withdraw Funds"
+                            >
+                              <CircleMinus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 mb-2">
                           <span className={cn(
                             "text-[10px] px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1",
                             agent.status === "active"

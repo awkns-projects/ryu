@@ -3,21 +3,22 @@ import { generateEthereumWallet } from '@/lib/wallet'
 
 const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
+// Interface matching Go backend CreateTraderRequest EXACTLY
 interface CreateTraderRequest {
-  name: string
-  ai_model_id: string
-  exchange_id: string
-  initial_balance?: number
-  scan_interval_minutes?: number
-  btc_eth_leverage?: number
-  altcoin_leverage?: number
-  trading_symbols?: string
-  custom_prompt?: string
-  override_base_prompt?: boolean
-  system_prompt_template?: string
-  is_cross_margin?: boolean
-  use_coin_pool?: boolean
-  use_oi_top?: boolean
+  name: string                      // required
+  ai_model_id: string              // required
+  exchange_id: string              // required
+  initial_balance?: number         // optional, default handled by backend
+  scan_interval_minutes?: number   // optional, default handled by backend
+  btc_eth_leverage?: number        // optional, default 5
+  altcoin_leverage?: number        // optional, default 5
+  trading_symbols?: string         // optional, comma-separated e.g. "BTCUSDT,ETHUSDT"
+  custom_prompt?: string           // optional, custom or template prompt
+  override_base_prompt?: boolean   // optional, default false
+  system_prompt_template?: string  // optional, template name or 'default'
+  is_cross_margin?: boolean        // optional, default true (we send false for isolated)
+  use_coin_pool?: boolean          // optional, default false
+  use_oi_top?: boolean             // optional, default false
 }
 
 export async function POST(request: NextRequest) {
@@ -37,6 +38,15 @@ export async function POST(request: NextRequest) {
     const body: CreateTraderRequest = await request.json()
 
     console.log('🔄 [API Route] Creating trader...', body.name)
+    console.log('📊 [API Route] Trader creation data:', {
+      name: body.name,
+      trading_symbols: body.trading_symbols,
+      custom_prompt: body.custom_prompt ? `${body.custom_prompt.substring(0, 50)}...` : '(none)',
+      system_prompt_template: body.system_prompt_template,
+      btc_eth_leverage: body.btc_eth_leverage,
+      altcoin_leverage: body.altcoin_leverage,
+      is_cross_margin: body.is_cross_margin,
+    })
 
     // ====================================
     // 🔐 STEP 1: Auto-create DeepSeek AI Model if needed
@@ -187,6 +197,28 @@ export async function POST(request: NextRequest) {
     // ====================================
     console.log('🔄 Creating trader in Go backend...')
 
+    const goBackendPayload = {
+      ...body,
+      ai_model_id: aiModelId, // Ensure we use the correct AI model ID
+      exchange_id: uniqueExchangeId, // Use the unique exchange ID if generated
+    }
+
+    console.log('📦 [API Route] COMPLETE payload being sent to Go backend (POST /api/traders):')
+    console.log('   ✅ name:', goBackendPayload.name)
+    console.log('   ✅ ai_model_id:', goBackendPayload.ai_model_id)
+    console.log('   ✅ exchange_id:', goBackendPayload.exchange_id)
+    console.log('   ✅ initial_balance:', goBackendPayload.initial_balance)
+    console.log('   ✅ trading_symbols:', goBackendPayload.trading_symbols || '(empty)')
+    console.log('   ✅ custom_prompt:', goBackendPayload.custom_prompt ? `${goBackendPayload.custom_prompt.substring(0, 50)}...` : '(empty)')
+    console.log('   ✅ override_base_prompt:', goBackendPayload.override_base_prompt)
+    console.log('   ✅ system_prompt_template:', goBackendPayload.system_prompt_template)
+    console.log('   ✅ is_cross_margin:', goBackendPayload.is_cross_margin, '← false=ISOLATED, true=CROSS')
+    console.log('   ✅ btc_eth_leverage:', goBackendPayload.btc_eth_leverage)
+    console.log('   ✅ altcoin_leverage:', goBackendPayload.altcoin_leverage)
+    console.log('   ✅ scan_interval_minutes:', goBackendPayload.scan_interval_minutes)
+    console.log('   ✅ use_coin_pool:', goBackendPayload.use_coin_pool)
+    console.log('   ✅ use_oi_top:', goBackendPayload.use_oi_top)
+
     // Forward request to Go backend
     const response = await fetch(`${BACKEND_URL}/api/traders`, {
       method: 'POST',
@@ -194,11 +226,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
         'Authorization': authHeader,
       },
-      body: JSON.stringify({
-        ...body,
-        ai_model_id: aiModelId, // Ensure we use the correct AI model ID
-        exchange_id: uniqueExchangeId, // Use the unique exchange ID if generated
-      }),
+      body: JSON.stringify(goBackendPayload),
     })
 
     // Handle authentication errors

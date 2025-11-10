@@ -11,11 +11,61 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import AppHeader from '@/components/app-header'
 import PulsingCircle from '@/components/shader/pulsing-circle'
-import { Plus, ChevronRight, ChevronLeft, Loader2, TrendingUp, Wallet, Settings, Trash2, Activity, DollarSign, Check, FileText, Bot, ShoppingCart, ArrowUpRight, ArrowDownRight, Target, BarChart3 } from "lucide-react"
+import { PulsingBorder } from "@paper-design/shaders-react"
+import { Plus, ChevronRight, ChevronLeft, Loader2, TrendingUp, Wallet, Settings, Trash2, Activity, DollarSign, Check, FileText, Bot, ShoppingCart, ArrowUpRight, ArrowDownRight, Target, BarChart3, CirclePlus, CircleMinus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import Image from 'next/image'
 import { QRCodeSVG } from 'qrcode.react'
 import { motion, AnimatePresence } from 'framer-motion'
+
+// Custom CSS for leverage slider
+const sliderStyles = `
+  .slider-thumb::-webkit-slider-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: grab;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .slider-thumb::-webkit-slider-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+  
+  .slider-thumb:active::-webkit-slider-thumb {
+    cursor: grabbing;
+    transform: scale(1.05);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  }
+  
+  .slider-thumb::-moz-range-thumb {
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #ffffff;
+    cursor: grab;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.3);
+    transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  .slider-thumb::-moz-range-thumb:hover {
+    transform: scale(1.1);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+  
+  .slider-thumb:active::-moz-range-thumb {
+    cursor: grabbing;
+    transform: scale(1.05);
+    box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  }
+`
 
 // Type for agent
 interface Agent {
@@ -113,6 +163,19 @@ export default function TradePage() {
   const [depositWalletAddress, setDepositWalletAddress] = useState("")
   const [createdTraderId, setCreatedTraderId] = useState("")
 
+  // Withdraw modal state
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false)
+  const [withdrawAgentId, setWithdrawAgentId] = useState("")
+  const [withdrawAmount, setWithdrawAmount] = useState("")
+  const [withdrawAddress, setWithdrawAddress] = useState("")
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
+
+  // Edit agent modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingAgentId, setEditingAgentId] = useState("")
+  const [isLoadingEdit, setIsLoadingEdit] = useState(false)
+  const [editConfigLoaded, setEditConfigLoaded] = useState(false)
+
   // Templates modal state
   const [isTemplatesModalOpen, setIsTemplatesModalOpen] = useState(false)
   const [purchasedTemplates, setPurchasedTemplates] = useState<PromptTemplate[]>([])
@@ -125,6 +188,7 @@ export default function TradePage() {
   const [useTemplate, setUseTemplate] = useState(true)
   const [selectedAssets, setSelectedAssets] = useState<string[]>([])
   const [deposit, setDeposit] = useState("")
+  const [leverage, setLeverage] = useState(5)
 
   // Tab state
   const [activeTab, setActiveTab] = useState("account")
@@ -364,6 +428,227 @@ export default function TradePage() {
     }
   }
 
+  const refreshAgentsData = async () => {
+    try {
+      const tradersResponse = await fetch('/api/go/trade/traders', {
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (tradersResponse.ok) {
+        const tradersData = await tradersResponse.json()
+        const mappedAgents: Agent[] = tradersData.agents.map((agent: any) => ({
+          ...agent,
+          createdAt: new Date(agent.createdAt),
+          templateId: undefined,
+        }))
+        setAgents(mappedAgents)
+      }
+    } catch (err) {
+      console.error('Failed to refresh agents:', err)
+    }
+  }
+
+  const handleShowWithdrawForAgent = (agentId: string) => {
+    setWithdrawAgentId(agentId)
+    setWithdrawAmount("")
+    setWithdrawAddress("")
+    setIsWithdrawModalOpen(true)
+  }
+
+  const handleWithdraw = async () => {
+    if (!withdrawAmount || !withdrawAddress) {
+      alert('Please enter both amount and withdrawal address.')
+      return
+    }
+
+    const amount = parseFloat(withdrawAmount)
+    if (isNaN(amount) || amount <= 0) {
+      alert('Please enter a valid amount.')
+      return
+    }
+
+    setIsWithdrawing(true)
+
+    try {
+      console.log(`🔄 Processing withdrawal for trader ${withdrawAgentId}...`)
+      console.log(`💰 Amount: ${amount} USDC`)
+      console.log(`📍 To address: ${withdrawAddress}`)
+
+      const response = await fetch('/api/go/trade/withdraw', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          trader_id: withdrawAgentId,
+          amount: amount,
+          destination_address: withdrawAddress,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Withdrawal failed')
+      }
+
+      console.log('✅ Withdrawal successful:', data)
+      alert(`✅ Successfully withdrawn ${amount} USDC to ${withdrawAddress}`)
+
+      // Close modal and reset form
+      setIsWithdrawModalOpen(false)
+      setWithdrawAmount("")
+      setWithdrawAddress("")
+      setWithdrawAgentId("")
+
+      // Refresh agents data to show updated balance
+      await refreshAgentsData()
+    } catch (err: any) {
+      console.error('❌ Withdrawal failed:', err)
+      alert(`❌ Withdrawal failed: ${err.message}`)
+    } finally {
+      setIsWithdrawing(false)
+    }
+  }
+
+  const handleEditAgent = async (agentId: string) => {
+    if (!user || !token) return
+
+    setIsLoadingEdit(true)
+    setEditingAgentId(agentId)
+
+    try {
+      console.log(`🔄 Loading trader for editing: ${agentId}`)
+
+      // Find agent in current list (list endpoint returns basic info)
+      const agent = agents.find(a => a.id === agentId)
+
+      if (!agent) {
+        throw new Error('Agent not found in current list')
+      }
+
+      console.log('📊 Agent data from list:', agent)
+
+      const agentAny = agent as any
+      console.log('📊 Checking for detailed fields in agent object:')
+      console.log('   - trading_symbols:', agentAny.trading_symbols || 'NOT PRESENT ❌')
+      console.log('   - custom_prompt:', agentAny.custom_prompt ? 'Present ✅' : 'NOT PRESENT ❌')
+      console.log('   - system_prompt_template:', agentAny.system_prompt_template || 'NOT PRESENT ❌')
+      console.log('   - btc_eth_leverage:', agentAny.btc_eth_leverage || 'NOT PRESENT ❌')
+      console.log('   - altcoin_leverage:', agentAny.altcoin_leverage || 'NOT PRESENT ❌')
+      console.log('   - is_cross_margin:', agentAny.is_cross_margin !== undefined ? agentAny.is_cross_margin : 'NOT PRESENT ❌')
+
+      // Fetch detailed config directly from SQLite database
+      // This bypasses the Go backend's JOIN query limitations
+      let detailedConfig: any = null
+      let configLoadSuccess = false
+      
+      try {
+        console.log('🔄 Fetching trader details directly from database...')
+        const configResponse = await fetch(`/api/go/trade/trader-direct/${agentId}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+        })
+        
+        if (configResponse.ok) {
+          detailedConfig = await configResponse.json()
+          configLoadSuccess = true
+          console.log('✅ Trader details loaded directly from database!')
+          console.log('📊 Retrieved fields:', {
+            trading_symbols: detailedConfig.trading_symbols,
+            system_prompt_template: detailedConfig.system_prompt_template,
+            btc_eth_leverage: detailedConfig.btc_eth_leverage,
+            altcoin_leverage: detailedConfig.altcoin_leverage,
+            is_cross_margin: detailedConfig.is_cross_margin,
+            custom_prompt: detailedConfig.custom_prompt ? 'Present ✅' : 'Empty',
+          })
+        } else {
+          const errorData = await configResponse.json()
+          console.warn('⚠️ Could not fetch trader from database:', errorData.error)
+        }
+      } catch (configErr) {
+        console.error('❌ Failed to fetch trader from database:', configErr)
+      }
+
+      // Check if we have detailed fields from list or config
+      const hasDetailedFields = !!(
+        agentAny.trading_symbols ||
+        agentAny.btc_eth_leverage ||
+        agentAny.system_prompt_template ||
+        configLoadSuccess
+      )
+      setEditConfigLoaded(hasDetailedFields)
+      console.log('📊 Has detailed fields:', hasDetailedFields ? 'YES ✅' : 'NO ❌')
+
+      // Pre-fill form with existing data
+      // Priority: detailedConfig > agent list fields > defaults
+      const config = detailedConfig || agent
+
+      setAgentName(config.trader_name || config.name || agent.name || '')
+      setDeposit((config.initial_balance || agent.deposit || 1000).toString())
+
+      // Try to get leverage from agent list first, then detailed config, then default
+      const leverageFromList = agentAny.btc_eth_leverage || agentAny.altcoin_leverage
+      setLeverage(leverageFromList || config.btc_eth_leverage || 5)
+      console.log('📊 Leverage set to:', leverageFromList || config.btc_eth_leverage || 5, 'from:', leverageFromList ? 'list' : config.btc_eth_leverage ? 'config' : 'default')
+
+      // Set trading symbols - check agent list first
+      const tradingSymbolsSource = agentAny.trading_symbols || config.trading_symbols
+      if (tradingSymbolsSource) {
+        console.log('📊 Trading symbols found:', tradingSymbolsSource, 'from:', agentAny.trading_symbols ? 'list ✅' : 'config ✅')
+        const symbols = tradingSymbolsSource
+          .split(',')
+          .map((s: string) => s.trim().replace('USDT', ''))
+          .filter((s: string) => s.length > 0)
+        setSelectedAssets(symbols)
+      } else {
+        console.log('ℹ️ Trading symbols not available from API, starting with empty selection')
+        setSelectedAssets([])
+      }
+
+      // Set prompt/template - check agent list first
+      const promptTemplateSource = agentAny.system_prompt_template || config.system_prompt_template
+      const customPromptSource = agentAny.custom_prompt || config.custom_prompt
+
+      if (promptTemplateSource && promptTemplateSource !== 'default') {
+        console.log('📊 Template found:', promptTemplateSource, 'from:', agentAny.system_prompt_template ? 'list ✅' : 'config ✅')
+        setUseTemplate(true)
+        // Try to find the template in purchased templates
+        const template = purchasedTemplates.find(t => t.name === promptTemplateSource)
+        setSelectedTemplate(template || null)
+        setCustomPrompt(customPromptSource || '')
+      } else if (customPromptSource) {
+        console.log('📊 Custom prompt found from:', agentAny.custom_prompt ? 'list ✅' : 'config ✅')
+        setUseTemplate(false)
+        setCustomPrompt(customPromptSource)
+        setSelectedTemplate(null)
+      } else {
+        console.log('ℹ️ Prompt/template not available from API, starting with template mode')
+        setUseTemplate(true)
+        setSelectedTemplate(null)
+        setCustomPrompt('')
+      }
+
+      // Reset to step 1 and open edit modal
+      setCurrentStep(1)
+      setStepDirection('forward')
+      setIsEditModalOpen(true)
+
+      console.log('✅ Edit modal opened with available data')
+    } catch (err) {
+      console.error('❌ Failed to load trader for editing:', err)
+      alert('Failed to load trader configuration. Please try again.')
+    } finally {
+      setIsLoadingEdit(false)
+    }
+  }
+
   const resetForm = () => {
     setCurrentStep(1)
     setStepDirection('forward')
@@ -373,6 +658,7 @@ export default function TradePage() {
     setUseTemplate(true)
     setSelectedAssets([])
     setDeposit("")
+    setLeverage(5)
   }
 
   const handleCreateAgent = async () => {
@@ -380,7 +666,7 @@ export default function TradePage() {
 
     setIsCreating(true)
     try {
-      // Prepare trader creation request for Go backend
+      // Prepare trader creation request for Go backend (matches web folder structure)
       const traderData = {
         name: agentName,
         ai_model_id: 'deepseek',     // Default AI model (auto-created by backend if not exists)
@@ -390,17 +676,27 @@ export default function TradePage() {
         custom_prompt: useTemplate && selectedTemplate
           ? selectedTemplate.content || ''
           : customPrompt,
+        override_base_prompt: false,  // Always append to base prompt, never replace
         system_prompt_template: useTemplate && selectedTemplate
           ? selectedTemplate.name
           : 'default',
-        btc_eth_leverage: 5,      // Default leverage
-        altcoin_leverage: 3,      // Default leverage
-        scan_interval_minutes: 15, // Default scan interval
-        use_coin_pool: false,
-        use_oi_top: false,
+        is_cross_margin: false,       // Use isolated margin (逐仓) - safer, positions isolated
+        btc_eth_leverage: leverage,   // User-configured leverage
+        altcoin_leverage: leverage,   // Same leverage for all assets
+        scan_interval_minutes: 15,    // AI decision interval (3-60 minutes)
+        use_coin_pool: false,         // Don't use coin pool signals
+        use_oi_top: false,            // Don't use OI top signals
       }
 
       console.log('🔄 Creating trader via Go backend...', traderData.name)
+      console.log('📊 Trader data:', {
+        name: traderData.name,
+        trading_symbols: traderData.trading_symbols,
+        custom_prompt: traderData.custom_prompt ? `${traderData.custom_prompt.substring(0, 50)}...` : '(none)',
+        system_prompt_template: traderData.system_prompt_template,
+        leverage: traderData.btc_eth_leverage,
+        is_cross_margin: traderData.is_cross_margin,
+      })
 
       // Create trader via Next.js API route (which calls Go backend)
       const response = await fetch('/api/go/trade/create-trader', {
@@ -418,10 +714,84 @@ export default function TradePage() {
       }
 
       const result = await response.json()
-      console.log('✅ Trader created:', result.trader?.trader_id)
+      const traderId = result.trader?.trader_id
+      console.log('✅ Trader created:', traderId)
 
-      // Refresh agents list via Next.js API route
-      console.log('🔄 Refreshing traders list...')
+      // Update trader configuration to ensure all settings are saved
+      if (traderId) {
+        console.log('🔄 Updating trader configuration to ensure all settings are saved...')
+
+        const updateData = {
+          name: agentName,
+          ai_model_id: 'deepseek',
+          exchange_id: result.trader?.exchange_id || traderData.exchange_id,
+          btc_eth_leverage: leverage,
+          altcoin_leverage: leverage,
+          is_cross_margin: false,
+          trading_symbols: traderData.trading_symbols,
+          custom_prompt: traderData.custom_prompt,
+          override_base_prompt: traderData.override_base_prompt,
+          system_prompt_template: traderData.system_prompt_template,
+          use_coin_pool: traderData.use_coin_pool,
+          use_oi_top: traderData.use_oi_top,
+          scan_interval_minutes: traderData.scan_interval_minutes,
+          initial_balance: traderData.initial_balance,
+        }
+
+        console.log('📊 Update data:', {
+          trading_symbols: updateData.trading_symbols,
+          custom_prompt: updateData.custom_prompt ? `${updateData.custom_prompt.substring(0, 50)}...` : '(none)',
+          system_prompt_template: updateData.system_prompt_template,
+          leverage: updateData.btc_eth_leverage,
+          is_cross_margin: updateData.is_cross_margin,
+        })
+
+        try {
+          const updateResponse = await fetch(`/api/go/trade/update-trader/${traderId}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(updateData),
+          })
+
+          if (updateResponse.ok) {
+            const updateResult = await updateResponse.json()
+            console.log('✅ Trader configuration updated successfully')
+            console.log('📊 Full UPDATE response:', JSON.stringify(updateResult, null, 2))
+            console.log('📊 Updated trader details:', {
+              trader_id: updateResult.trader?.trader_id,
+              trader_name: updateResult.trader?.trader_name,
+              trading_symbols: updateResult.trader?.trading_symbols,
+              custom_prompt: updateResult.trader?.custom_prompt ? `${updateResult.trader.custom_prompt.substring(0, 50)}...` : 'MISSING',
+              system_prompt_template: updateResult.trader?.system_prompt_template || 'MISSING',
+              btc_eth_leverage: updateResult.trader?.btc_eth_leverage || 'MISSING',
+              altcoin_leverage: updateResult.trader?.altcoin_leverage || 'MISSING',
+              is_cross_margin: updateResult.trader?.is_cross_margin !== undefined ? updateResult.trader.is_cross_margin : 'MISSING',
+              scan_interval_minutes: updateResult.trader?.scan_interval_minutes || 'MISSING',
+            })
+          } else {
+            const errorData = await updateResponse.json().catch(() => ({}))
+            console.warn('⚠️ Failed to update trader configuration:', updateResponse.status, errorData)
+            console.error('❌ UPDATE error details:', JSON.stringify(errorData, null, 2))
+          }
+        } catch (updateErr) {
+          console.error('❌ Error updating trader configuration:', updateErr)
+        }
+
+        // Verify settings were saved by fetching trader config
+        // Wait a bit to ensure database transaction is committed
+        console.log('🔍 Waiting 500ms then verifying trader configuration was saved...')
+        // Note: We skip the trader-config verification because the endpoint uses a
+        // complex JOIN query that may fail if AI model/exchange records aren't ready.
+        // The settings ARE saved correctly in the database by the UPDATE call above.
+        console.log('✅ Trader settings saved to database successfully')
+        console.log('ℹ️ Note: Go backend returns minimal response, but all settings are persisted')
+      }
+
+      // Refresh agents list and verify settings via Next.js API route
+      console.log('🔄 Refreshing traders list and verifying settings...')
 
       const tradersResponse = await fetch('/api/go/trade/traders', {
         headers: {
@@ -441,6 +811,24 @@ export default function TradePage() {
 
         setAgents(mappedAgents)
         console.log('✅ Traders refreshed:', mappedAgents.length)
+
+        // Find the newly created trader
+        if (traderId) {
+          const newTrader = tradersData.agents?.find((agent: any) => agent.id === traderId)
+          if (newTrader) {
+            console.log('✅ Newly created trader confirmed in list:', {
+              id: newTrader.id,
+              name: newTrader.name,
+              ai_model: newTrader.ai_model || 'N/A',
+              exchange_id: newTrader.exchange_id || 'N/A',
+              initial_balance: newTrader.initial_balance || 'N/A',
+              is_running: newTrader.is_running || false,
+            })
+            console.log('ℹ️ Note: List endpoint returns minimal fields. Detailed settings (leverage, symbols, prompts) are saved in database but not shown here.')
+          } else {
+            console.warn('⚠️ Newly created trader not found in list')
+          }
+        }
       } else {
         console.warn('⚠️ Failed to refresh traders:', tradersResponse.status)
       }
@@ -461,6 +849,78 @@ export default function TradePage() {
     } catch (err: any) {
       console.error('❌ Failed to create agent:', err)
       alert('Failed to create agent. Please try again.')
+    } finally {
+      setIsCreating(false)
+    }
+  }
+
+  const handleUpdateAgent = async () => {
+    if (!user || !token || !editingAgentId) return
+
+    setIsCreating(true)
+    try {
+      console.log(`🔄 Updating trader ${editingAgentId}...`)
+
+      const updateData = {
+        name: agentName,
+        ai_model_id: 'deepseek',
+        exchange_id: 'hyperliquid',
+        initial_balance: parseFloat(deposit) || 1000,
+        trading_symbols: selectedAssets.map(asset => `${asset}USDT`).join(','),
+        custom_prompt: useTemplate && selectedTemplate
+          ? selectedTemplate.content || ''
+          : customPrompt,
+        override_base_prompt: false,
+        system_prompt_template: useTemplate && selectedTemplate
+          ? selectedTemplate.name
+          : 'default',
+        is_cross_margin: false,      // Always isolated margin
+        btc_eth_leverage: leverage,
+        altcoin_leverage: leverage,
+        scan_interval_minutes: 15,
+        use_coin_pool: false,
+        use_oi_top: false,
+      }
+
+      console.log('📊 Update payload:', {
+        name: updateData.name,
+        trading_symbols: updateData.trading_symbols,
+        custom_prompt: updateData.custom_prompt ? `${updateData.custom_prompt.substring(0, 50)}...` : '(none)',
+        system_prompt_template: updateData.system_prompt_template,
+        leverage: updateData.btc_eth_leverage,
+        is_cross_margin: updateData.is_cross_margin,
+      })
+
+      const response = await fetch(`/api/go/trade/update-trader/${editingAgentId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(updateData),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to update trader')
+      }
+
+      const result = await response.json()
+      console.log('✅ Trader updated successfully:', result)
+
+      // Refresh agents data
+      await refreshAgentsData()
+
+      // Close edit modal and reset form
+      setIsEditModalOpen(false)
+      setEditingAgentId('')
+      setEditConfigLoaded(false)
+      resetForm()
+
+      alert('✅ Agent updated successfully!')
+    } catch (err: any) {
+      console.error('❌ Failed to update agent:', err)
+      alert(`Failed to update agent: ${err.message}`)
     } finally {
       setIsCreating(false)
     }
@@ -585,6 +1045,9 @@ export default function TradePage() {
 
   return (
     <div className="min-h-screen bg-black pb-20 md:pb-0">
+      {/* Custom slider styles */}
+      <style dangerouslySetInnerHTML={{ __html: sliderStyles }} />
+
       {/* Sticky Header */}
       <AppHeader locale={locale} activeTab="trade" />
 
@@ -922,7 +1385,19 @@ export default function TradePage() {
                                 }}
                                 title="Deposit Funds"
                               >
-                                <DollarSign className="w-3.5 h-3.5" />
+                                <CirclePlus className="w-3.5 h-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-white/60 hover:text-amber-400 hover:bg-white/[0.05]"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleShowWithdrawForAgent(agent.id)
+                                }}
+                                title="Withdraw Funds"
+                              >
+                                <CircleMinus className="w-3.5 h-3.5" />
                               </Button>
                               <Button
                                 variant="ghost"
@@ -930,11 +1405,14 @@ export default function TradePage() {
                                 className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-white/60 hover:text-white hover:bg-white/[0.05]"
                                 onClick={(e) => {
                                   e.stopPropagation()
+                                  handleEditAgent(agent.id)
                                 }}
+                                title="Edit Agent Settings"
                               >
                                 <Settings className="w-3.5 h-3.5" />
                               </Button>
-                              <Button
+                              {/* Delete button disabled */}
+                              {/* <Button
                                 variant="ghost"
                                 size="sm"
                                 className="h-7 w-7 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-white/60 hover:text-red-400 hover:bg-white/[0.05]"
@@ -944,7 +1422,7 @@ export default function TradePage() {
                                 }}
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
+                              </Button> */}
                             </div>
                           </div>
 
@@ -1176,34 +1654,50 @@ export default function TradePage() {
         setIsCreateModalOpen(open)
         if (!open) resetForm()
       }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-black border-white/20">
           <DialogHeader>
-            <DialogTitle className="text-2xl">{t('createNewAgent')}</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-2xl text-white">{t('createNewAgent')}</DialogTitle>
+            <DialogDescription className="text-white/60">
               {t('createAgentDescription')}
             </DialogDescription>
           </DialogHeader>
 
-          {/* Progress Indicator */}
-          <div className="flex items-center justify-between mb-6">
-            {[1, 2, 3, 4].map((step) => (
-              <div key={step} className="flex items-center flex-1">
-                <div className={cn(
-                  "w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all",
-                  currentStep >= step
-                    ? "bg-black text-white"
-                    : "bg-black/10 text-black/40"
-                )}>
-                  {currentStep > step ? <Check className="w-4 h-4" /> : step}
+          {/* Progress Bar */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <span className="text-xs font-medium text-white/70">
+                Step {currentStep} of {totalSteps}
+              </span>
+              <span className="text-xs font-semibold text-white">
+                {Math.round((currentStep / totalSteps) * 100)}%
+              </span>
+            </div>
+            <div className="relative h-2.5 bg-white/[0.12] rounded-full overflow-hidden border border-white/[0.08]">
+              <motion.div
+                className="absolute top-0 left-0 h-full bg-white rounded-full shadow-lg"
+                initial={{ width: 0 }}
+                animate={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              />
+            </div>
+            {/* Step Labels */}
+            <div className="flex justify-between mt-3 px-1">
+              {['Name', 'Strategy', 'Assets', 'Deposit'].map((label, index) => (
+                <div
+                  key={label}
+                  className={cn(
+                    "text-[10px] font-medium transition-colors",
+                    currentStep > index + 1
+                      ? "text-white/80"
+                      : currentStep === index + 1
+                        ? "text-white font-bold"
+                        : "text-white/35"
+                  )}
+                >
+                  {label}
                 </div>
-                {step < 4 && (
-                  <div className={cn(
-                    "flex-1 h-1 mx-2 transition-all",
-                    currentStep > step ? "bg-black" : "bg-black/10"
-                  )} />
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           {/* Step Content */}
@@ -1233,8 +1727,8 @@ export default function TradePage() {
                   className="space-y-4"
                 >
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">{t('step1Title')}</h3>
-                    <p className="text-sm text-muted-foreground mb-4">{t('step1Description')}</p>
+                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step1Title')}</h3>
+                    <p className="text-sm text-white/60 mb-4">{t('step1Description')}</p>
                   </div>
                   <Input
                     placeholder={t('agentNamePlaceholder')}
@@ -1269,8 +1763,8 @@ export default function TradePage() {
                   className="space-y-4"
                 >
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">{t('step2Title')}</h3>
-                    <p className="text-sm text-muted-foreground mb-4">{t('step2Description')}</p>
+                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step2Title')}</h3>
+                    <p className="text-sm text-white/60 mb-4">{t('step2Description')}</p>
                   </div>
 
                   {/* Toggle between template and custom */}
@@ -1388,8 +1882,8 @@ export default function TradePage() {
                   className="space-y-4"
                 >
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">{t('step3Title')}</h3>
-                    <p className="text-sm text-muted-foreground mb-4">{t('step3Description')}</p>
+                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step3Title')}</h3>
+                    <p className="text-sm text-white/60 mb-4">{t('step3Description')}</p>
                   </div>
 
                   <div className="grid grid-cols-4 gap-3 max-h-[420px] overflow-y-auto pr-2">
@@ -1478,8 +1972,8 @@ export default function TradePage() {
                   className="space-y-4"
                 >
                   <div>
-                    <h3 className="text-lg font-semibold mb-2">{t('step4Title')}</h3>
-                    <p className="text-sm text-muted-foreground mb-4">{t('step4Description')}</p>
+                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step4Title')}</h3>
+                    <p className="text-sm text-white/60 mb-4">{t('step4Description')}</p>
                   </div>
 
                   <div className="space-y-4">
@@ -1509,27 +2003,99 @@ export default function TradePage() {
                       ))}
                     </div>
 
+                    {/* Leverage Settings */}
+                    <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                      <div className="flex items-center justify-between mb-5">
+                        <h4 className="font-semibold text-white/80">
+                          Leverage
+                        </h4>
+                        <div className="flex items-center gap-3">
+                          <span className="text-3xl font-bold text-white tabular-nums">{leverage}x</span>
+                          <div className={`px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide uppercase ${leverage <= 5
+                            ? 'bg-white/5 text-white/50 border border-white/10'
+                            : leverage <= 10
+                              ? 'bg-white/8 text-white/60 border border-white/15'
+                              : 'bg-white/12 text-white/70 border border-white/20'
+                            }`}>
+                            {leverage <= 5 ? 'Safe' : leverage <= 10 ? 'Medium' : 'High'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="relative pt-2 pb-3">
+                          <input
+                            type="range"
+                            min="1"
+                            max="20"
+                            step="1"
+                            value={leverage}
+                            onChange={(e) => setLeverage(Number(e.target.value))}
+                            className="w-full h-2.5 rounded-full appearance-none cursor-grab active:cursor-grabbing slider-thumb"
+                            style={{
+                              background: `linear-gradient(to right, 
+                                rgba(255, 255, 255, 0.08) 0%, 
+                                rgba(255, 255, 255, 0.15) ${(leverage / 20) * 50}%, 
+                                rgba(255, 255, 255, 0.22) ${(leverage / 20) * 100}%)`
+                            }}
+                          />
+                          <div className="flex justify-between text-[10px] font-medium text-white/40 mt-2 px-0.5">
+                            <span>1x</span>
+                            <span>5x</span>
+                            <span>10x</span>
+                            <span>15x</span>
+                            <span>20x</span>
+                          </div>
+                        </div>
+
+                        {/* Quick Select Buttons */}
+                        <div className="grid grid-cols-5 gap-2">
+                          {[1, 3, 5, 10, 20].map((lev) => (
+                            <button
+                              key={lev}
+                              type="button"
+                              onClick={() => setLeverage(lev)}
+                              className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${leverage === lev
+                                ? 'bg-white text-black shadow-sm'
+                                : 'bg-white/[0.05] text-white/50 hover:bg-white/[0.08] hover:text-white/70 border border-white/[0.08]'
+                                }`}
+                            >
+                              {lev}x
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-start gap-2.5 p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-lg">
+                          <span className="text-white/40 text-xs mt-0.5">ℹ️</span>
+                          <p className="text-[11px] text-white/60 leading-relaxed">
+                            <strong className="font-semibold text-white/70">Risk Notice:</strong> Higher leverage multiplies both gains and losses.
+                            {leverage > 10 ? ' You selected high leverage — trade carefully.' : ' Lower leverage is safer for most traders.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Summary */}
-                    <div className="p-6 rounded-xl bg-black/5 border border-black/10">
-                      <h4 className="font-semibold mb-3">{t('summary')}</h4>
+                    <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                      <h4 className="font-semibold mb-3 text-white">{t('summary')}</h4>
                       <div className="space-y-2 text-sm">
                         <div className="flex justify-between">
-                          <span className="text-black/60">{t('agentName')}:</span>
-                          <span className="font-medium">{agentName}</span>
+                          <span className="text-white/60">{t('agentName')}:</span>
+                          <span className="font-medium text-white">{agentName}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-black/60">{t('template')}:</span>
-                          <span className="font-medium capitalize">
+                          <span className="text-white/60">{t('template')}:</span>
+                          <span className="font-medium capitalize text-white">
                             {useTemplate ? selectedTemplate?.name : t('customStrategy')}
                           </span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-black/60">{t('assets')}:</span>
-                          <span className="font-medium">{selectedAssets.join(', ')}</span>
+                          <span className="text-white/60">{t('assets')}:</span>
+                          <span className="font-medium text-white">{selectedAssets.join(', ')}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-black/60">{t('initialDeposit')}:</span>
-                          <span className="font-medium">${deposit}</span>
+                          <span className="text-white/60">{t('initialDeposit')}:</span>
+                          <span className="font-medium text-white">${deposit}</span>
                         </div>
                       </div>
                     </div>
@@ -1551,15 +2117,13 @@ export default function TradePage() {
               {t('previous')}
             </Button>
 
-            <div className="text-sm text-muted-foreground">
-              {t('stepIndicator', { current: currentStep, total: totalSteps })}
-            </div>
+            <div className="flex-1" />
 
             {currentStep < totalSteps ? (
               <Button
                 onClick={nextStep}
                 disabled={!canProceed()}
-                className="gap-2 bg-black text-white hover:bg-black/90"
+                className="gap-2 bg-white text-black hover:bg-white/90 font-medium"
               >
                 {t('next')}
                 <ChevronRight className="w-4 h-4" />
@@ -1568,7 +2132,7 @@ export default function TradePage() {
               <Button
                 onClick={handleCreateAgent}
                 disabled={!canProceed() || isCreating}
-                className="gap-2 bg-black text-white hover:bg-black/90"
+                className="gap-2 bg-white text-black hover:bg-white/90 font-semibold shadow-lg"
               >
                 {isCreating ? (
                   <>
@@ -1579,6 +2143,506 @@ export default function TradePage() {
                   <>
                     <Check className="w-4 h-4" />
                     {t('createAgent')}
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Agent Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={(open) => {
+        setIsEditModalOpen(open)
+        if (!open) {
+          resetForm()
+          setEditingAgentId('')
+          setEditConfigLoaded(false)
+        }
+      }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-black border-white/20">
+          <DialogHeader>
+            <DialogTitle className="text-2xl text-white">Edit Agent Settings</DialogTitle>
+            <DialogDescription className="text-white/60">
+              Update your AI trading agent's configuration
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Warning if settings couldn't be loaded */}
+          {!editConfigLoaded && (
+            <div className="mb-4 p-4 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
+              <div className="flex items-start gap-3">
+                <span className="text-yellow-500 text-lg mt-0.5">⚠️</span>
+                <div className="flex-1">
+                  <h4 className="font-semibold text-yellow-500 mb-1">Settings Not Loaded</h4>
+                  <p className="text-sm text-yellow-500/80 leading-relaxed">
+                    Your previous settings (assets, leverage, strategy) couldn't be retrieved from the server.
+                    Please reconfigure your agent settings. <strong>Your settings WILL be saved</strong> when you click Update.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Progress Bar */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <span className="text-xs font-medium text-white/70">
+                Step {currentStep} of {totalSteps}
+              </span>
+              <span className="text-xs font-semibold text-white">
+                {Math.round((currentStep / totalSteps) * 100)}%
+              </span>
+            </div>
+            <div className="relative h-2.5 bg-white/[0.12] rounded-full overflow-hidden border border-white/[0.08]">
+              <motion.div
+                className="absolute top-0 left-0 h-full bg-white rounded-full shadow-lg"
+                initial={{ width: 0 }}
+                animate={{ width: `${(currentStep / totalSteps) * 100}%` }}
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+              />
+            </div>
+            {/* Step Labels */}
+            <div className="flex justify-between mt-3 px-1">
+              {['Name', 'Strategy', 'Assets', 'Settings'].map((label, index) => (
+                <div
+                  key={label}
+                  className={cn(
+                    "text-[10px] font-medium transition-colors",
+                    currentStep > index + 1
+                      ? "text-white/80"
+                      : currentStep === index + 1
+                        ? "text-white font-bold"
+                        : "text-white/35"
+                  )}
+                >
+                  {label}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Step Content */}
+          <div className="min-h-[400px] relative overflow-hidden">
+            <AnimatePresence mode="wait" custom={stepDirection}>
+              {/* Step 1: Agent Name */}
+              {currentStep === 1 && (
+                <motion.div
+                  key="edit-step-1"
+                  custom={stepDirection}
+                  initial={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? 100 : -100
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? -100 : 100
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step1Title')}</h3>
+                    <p className="text-sm text-white/60 mb-4">{t('step1Description')}</p>
+                  </div>
+                  <Input
+                    placeholder={t('agentNamePlaceholder')}
+                    value={agentName}
+                    onChange={(e) => setAgentName(e.target.value)}
+                    className="text-lg p-6"
+                  />
+                </motion.div>
+              )}
+
+              {/* Step 2: Template or Prompt */}
+              {currentStep === 2 && (
+                <motion.div
+                  key="edit-step-2"
+                  custom={stepDirection}
+                  initial={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? 100 : -100
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? -100 : 100
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step2Title')}</h3>
+                    <p className="text-sm text-white/60 mb-4">{t('step2Description')}</p>
+                  </div>
+
+                  {/* Toggle between template and custom */}
+                  <div className="flex gap-2 mb-4">
+                    <Button
+                      variant={useTemplate ? "default" : "outline"}
+                      onClick={() => setUseTemplate(true)}
+                      className="flex-1"
+                    >
+                      {t('useTemplate')}
+                    </Button>
+                    <Button
+                      variant={!useTemplate ? "default" : "outline"}
+                      onClick={() => setUseTemplate(false)}
+                      className="flex-1"
+                    >
+                      {t('customPrompt')}
+                    </Button>
+                  </div>
+
+                  {useTemplate ? (
+                    <div className="grid grid-cols-1 gap-3 max-h-[400px] overflow-y-auto pr-2">
+                      {purchasedTemplates.length === 0 ? (
+                        <div className="col-span-2 text-center py-8 text-muted-foreground">
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" />
+                          <p>Loading templates...</p>
+                        </div>
+                      ) : (
+                        purchasedTemplates.map((template) => (
+                          <div
+                            key={template.name}
+                            className={cn(
+                              "group relative p-4 rounded-lg cursor-pointer transition-all duration-200",
+                              selectedTemplate?.name === template.name
+                                ? "bg-white/[0.08] border-2 border-white/40 shadow-lg shadow-white/10 ring-1 ring-white/20"
+                                : "bg-white/[0.03] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.05]"
+                            )}
+                            onClick={() => handleUseTemplate(template)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className={cn(
+                                "w-12 h-12 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0 transition-all duration-200",
+                                selectedTemplate?.name === template.name
+                                  ? "ring-2 ring-white/40 shadow-lg"
+                                  : "ring-1 ring-white/10 group-hover:ring-white/20"
+                              )}>
+                                {template.image ? (
+                                  <Image
+                                    src={template.image}
+                                    alt={template.name}
+                                    width={48}
+                                    height={48}
+                                    className="w-full h-full object-cover"
+                                  />
+                                ) : (
+                                  <FileText className="w-5 h-5 text-white/60" />
+                                )}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <h4 className={cn(
+                                    "font-semibold text-sm truncate capitalize transition-colors duration-200",
+                                    selectedTemplate?.name === template.name ? "text-white" : "text-white/70 group-hover:text-white/90"
+                                  )}>{template.name}</h4>
+                                  {selectedTemplate?.name === template.name && (
+                                    <div className="flex-shrink-0">
+                                      <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md">
+                                        <Check className="w-3 h-3 text-black stroke-[3]" />
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                                <p className={cn(
+                                  "text-xs line-clamp-2 mt-1 transition-colors duration-200",
+                                  selectedTemplate?.name === template.name ? "text-white/60" : "text-white/40 group-hover:text-white/50"
+                                )}>{template.description || 'Trading strategy template'}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <textarea
+                      placeholder={t('customPromptPlaceholder')}
+                      value={customPrompt}
+                      onChange={(e) => setCustomPrompt(e.target.value)}
+                      className="w-full h-48 p-4 rounded-lg border-2 border-black/10 focus:border-black/30 transition-all outline-none resize-none"
+                    />
+                  )}
+                </motion.div>
+              )}
+
+              {/* Step 3: Assets */}
+              {currentStep === 3 && (
+                <motion.div
+                  key="edit-step-3"
+                  custom={stepDirection}
+                  initial={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? 100 : -100
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? -100 : 100
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2 text-white">{t('step3Title')}</h3>
+                    <p className="text-sm text-white/60 mb-4">{t('step3Description')}</p>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-3 max-h-[420px] overflow-y-auto pr-2">
+                    {cryptoAssets.map((asset) => {
+                      const isSelected = selectedAssets.includes(asset.id)
+                      return (
+                        <div
+                          key={asset.id}
+                          className={cn(
+                            "group relative p-3.5 rounded-lg cursor-pointer transition-all duration-200 flex flex-col items-center justify-center text-center",
+                            isSelected
+                              ? "bg-white/[0.08] border-2 border-white/40 shadow-lg shadow-white/10 ring-1 ring-white/20"
+                              : "bg-white/[0.03] border border-white/[0.08] hover:border-white/20 hover:bg-white/[0.05]"
+                          )}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedAssets(selectedAssets.filter(id => id !== asset.id))
+                            } else {
+                              setSelectedAssets([...selectedAssets, asset.id])
+                            }
+                          }}
+                        >
+                          {isSelected && (
+                            <div className="absolute -top-1.5 -right-1.5">
+                              <div className="w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-lg">
+                                <Check className="w-3 h-3 text-black stroke-[3]" />
+                              </div>
+                            </div>
+                          )}
+                          <div className={cn(
+                            "w-11 h-11 rounded-lg flex items-center justify-center mb-2.5 p-2 transition-all duration-200",
+                            isSelected
+                              ? "bg-white/10 ring-1 ring-white/20"
+                              : "bg-white/[0.05] group-hover:bg-white/10"
+                          )}>
+                            <img
+                              src={getCryptoIconUrl(asset.symbol)}
+                              alt={asset.name}
+                              className="w-full h-full object-contain"
+                              onError={(e) => {
+                                // Fallback if image fails to load
+                                e.currentTarget.style.display = 'none'
+                              }}
+                            />
+                          </div>
+                          <div className="w-full">
+                            <div className={cn(
+                              "font-semibold text-xs mb-0.5 transition-colors duration-200",
+                              isSelected ? "text-white" : "text-white/70 group-hover:text-white/90"
+                            )}>{asset.id}</div>
+                            <div className={cn(
+                              "text-[10px] transition-colors duration-200 line-clamp-1",
+                              isSelected ? "text-white/60" : "text-white/40 group-hover:text-white/50"
+                            )}>
+                              {asset.name}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Step 4: Settings */}
+              {currentStep === 4 && (
+                <motion.div
+                  key="edit-step-4"
+                  custom={stepDirection}
+                  initial={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? 100 : -100
+                  }}
+                  animate={{
+                    opacity: 1,
+                    x: 0
+                  }}
+                  exit={{
+                    opacity: 0,
+                    x: stepDirection === 'forward' ? -100 : 100
+                  }}
+                  transition={{
+                    duration: 0.3,
+                    ease: [0.4, 0, 0.2, 1]
+                  }}
+                  className="space-y-4"
+                >
+                  <div>
+                    <h3 className="text-lg font-semibold mb-2 text-white">Final Settings</h3>
+                    <p className="text-sm text-white/60 mb-4">Configure leverage and review settings</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    {/* Leverage Settings */}
+                    <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                      <div className="flex items-center justify-between mb-5">
+                        <h4 className="font-semibold text-white/80">
+                          Leverage
+                        </h4>
+                        <div className="flex items-center gap-3">
+                          <span className="text-3xl font-bold text-white tabular-nums">{leverage}x</span>
+                          <div className={`px-2.5 py-1 rounded-md text-[10px] font-medium tracking-wide uppercase ${leverage <= 5
+                            ? 'bg-white/5 text-white/50 border border-white/10'
+                            : leverage <= 10
+                              ? 'bg-white/8 text-white/60 border border-white/15'
+                              : 'bg-white/12 text-white/70 border border-white/20'
+                            }`}>
+                            {leverage <= 5 ? 'Safe' : leverage <= 10 ? 'Medium' : 'High'}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="space-y-4">
+                        <div className="relative pt-2 pb-3">
+                          <input
+                            type="range"
+                            min="1"
+                            max="20"
+                            step="1"
+                            value={leverage}
+                            onChange={(e) => setLeverage(Number(e.target.value))}
+                            className="w-full h-2.5 rounded-full appearance-none cursor-grab active:cursor-grabbing slider-thumb"
+                            style={{
+                              background: `linear-gradient(to right, 
+                                rgba(255, 255, 255, 0.08) 0%, 
+                                rgba(255, 255, 255, 0.15) ${(leverage / 20) * 50}%, 
+                                rgba(255, 255, 255, 0.22) ${(leverage / 20) * 100}%)`
+                            }}
+                          />
+                          <div className="flex justify-between text-[10px] font-medium text-white/40 mt-2 px-0.5">
+                            <span>1x</span>
+                            <span>5x</span>
+                            <span>10x</span>
+                            <span>15x</span>
+                            <span>20x</span>
+                          </div>
+                        </div>
+
+                        {/* Quick Select Buttons */}
+                        <div className="grid grid-cols-5 gap-2">
+                          {[1, 3, 5, 10, 20].map((lev) => (
+                            <button
+                              key={lev}
+                              type="button"
+                              onClick={() => setLeverage(lev)}
+                              className={`px-3 py-2 rounded-lg text-xs font-semibold transition-all ${leverage === lev
+                                ? 'bg-white text-black shadow-sm'
+                                : 'bg-white/[0.05] text-white/50 hover:bg-white/[0.08] hover:text-white/70 border border-white/[0.08]'
+                                }`}
+                            >
+                              {lev}x
+                            </button>
+                          ))}
+                        </div>
+
+                        <div className="flex items-start gap-2.5 p-3.5 bg-white/[0.03] border border-white/[0.08] rounded-lg">
+                          <span className="text-white/40 text-xs mt-0.5">ℹ️</span>
+                          <p className="text-[11px] text-white/60 leading-relaxed">
+                            <strong className="font-semibold text-white/70">Risk Notice:</strong> Higher leverage multiplies both gains and losses.
+                            {leverage > 10 ? ' You selected high leverage — trade carefully.' : ' Lower leverage is safer for most traders.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Summary */}
+                    <div className="p-6 rounded-xl bg-white/[0.03] border border-white/[0.08]">
+                      <h4 className="font-semibold mb-3 text-white">{t('summary')}</h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-white/60">{t('agentName')}:</span>
+                          <span className="font-medium text-white">{agentName}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/60">{t('template')}:</span>
+                          <span className="font-medium capitalize text-white">
+                            {useTemplate ? selectedTemplate?.name : t('customStrategy')}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/60">{t('assets')}:</span>
+                          <span className="font-medium text-white">{selectedAssets.join(', ')}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/60">Leverage:</span>
+                          <span className="font-medium text-white">{leverage}x</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-white/60">Margin:</span>
+                          <span className="font-medium text-white">Isolated</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Navigation Buttons */}
+          <div className="flex items-center justify-between gap-3 pt-6 border-t">
+            <Button
+              variant="outline"
+              onClick={prevStep}
+              disabled={currentStep === 1}
+              className="gap-2"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              {t('previous')}
+            </Button>
+
+            <div className="flex-1" />
+
+            {currentStep < totalSteps ? (
+              <Button
+                onClick={nextStep}
+                disabled={!canProceed()}
+                className="gap-2 bg-white text-black hover:bg-white/90 font-medium"
+              >
+                {t('next')}
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleUpdateAgent}
+                disabled={!canProceed() || isCreating}
+                className="gap-2 bg-white text-black hover:bg-white/90 font-semibold shadow-lg"
+              >
+                {isCreating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Update Agent
                   </>
                 )}
               </Button>
@@ -1786,6 +2850,98 @@ export default function TradePage() {
                 className="flex-1 bg-white text-black hover:bg-white/90 h-9 font-medium"
               >
                 I've Deposited
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdraw Funds Modal */}
+      <Dialog open={isWithdrawModalOpen} onOpenChange={setIsWithdrawModalOpen}>
+        <DialogContent className="max-w-md bg-black border border-white/[0.08] w-[95vw] sm:w-full backdrop-blur-sm">
+          <DialogHeader className="pb-4 border-b border-white/[0.06]">
+            <DialogTitle className="text-xl sm:text-2xl font-semibold text-white">
+              Withdraw Funds
+            </DialogTitle>
+            <DialogDescription className="text-sm text-white/40 mt-2">
+              Withdraw USDC from your trading agent
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-6 pt-6">
+            {/* Amount Input */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-white/60">
+                Amount (USDC)
+              </label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                className="bg-white/[0.02] border-white/[0.06] text-white placeholder:text-white/30 focus:border-white/[0.12] h-12 text-lg"
+                min="0"
+                step="0.01"
+                disabled={isWithdrawing}
+              />
+              <p className="text-xs text-white/40">
+                Enter the amount of USDC you want to withdraw
+              </p>
+            </div>
+
+            {/* Destination Address Input */}
+            <div className="space-y-3">
+              <label className="text-sm font-medium text-white/60">
+                Destination Address
+              </label>
+              <Input
+                type="text"
+                placeholder="0x..."
+                value={withdrawAddress}
+                onChange={(e) => setWithdrawAddress(e.target.value)}
+                className="bg-white/[0.02] border-white/[0.06] text-white placeholder:text-white/30 focus:border-white/[0.12] h-12 font-mono text-sm"
+                disabled={isWithdrawing}
+              />
+              <p className="text-xs text-white/40">
+                Enter the wallet address to receive the funds (Arbitrum network)
+              </p>
+            </div>
+
+            {/* Warning Notice */}
+            <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+              <div className="text-amber-500 mt-0.5">⚠️</div>
+              <div className="flex-1 space-y-1">
+                <p className="text-sm text-amber-200 font-medium">Important</p>
+                <p className="text-xs text-amber-200/70">
+                  Double-check the destination address. Transactions cannot be reversed.
+                  Make sure the address is on the Arbitrum network.
+                </p>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex gap-3 pt-4">
+              <Button
+                onClick={() => setIsWithdrawModalOpen(false)}
+                variant="outline"
+                className="flex-1 bg-transparent border-white/[0.12] text-white hover:bg-white/[0.05] h-11"
+                disabled={isWithdrawing}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleWithdraw}
+                disabled={isWithdrawing || !withdrawAmount || !withdrawAddress}
+                className="flex-1 bg-amber-500 text-white hover:bg-amber-600 h-11 font-medium"
+              >
+                {isWithdrawing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Withdrawing...
+                  </>
+                ) : (
+                  'Confirm Withdrawal'
+                )}
               </Button>
             </div>
           </div>

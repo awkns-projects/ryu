@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { TemplatesHeader } from "@/components/templates/templates-header"
-import { Plus, Settings, Trash2, PlayCircle, FolderOpen, Activity, Calendar, TrendingUp, Loader2, Sparkles, MessageSquare, ArrowRight } from "lucide-react"
+import { Plus, Settings, Trash2, PlayCircle, FolderOpen, Activity, Calendar, TrendingUp, Loader2, Sparkles, MessageSquare, ArrowRight, CirclePlus, CircleMinus } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { api } from "@/lib/authenticated-fetch"
 import { UsageLimitsBanner } from "@/components/usage-limits-banner"
@@ -234,6 +234,30 @@ export default function MyAgentsPage() {
                       <Button
                         variant="ghost"
                         size="sm"
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-green-500"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // TODO: Handle deposit funds
+                        }}
+                        title="Deposit Funds"
+                      >
+                        <CirclePlus className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-amber-500"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          // TODO: Handle withdraw funds
+                        }}
+                        title="Withdraw Funds"
+                      >
+                        <CircleMinus className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
                         className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                         onClick={(e) => {
                           e.stopPropagation()
@@ -242,7 +266,8 @@ export default function MyAgentsPage() {
                       >
                         <Settings className="w-4 h-4" />
                       </Button>
-                      <Button
+                      {/* Delete button disabled */}
+                      {/* <Button
                         variant="ghost"
                         size="sm"
                         className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
@@ -252,7 +277,7 @@ export default function MyAgentsPage() {
                         }}
                       >
                         <Trash2 className="w-4 h-4" />
-                      </Button>
+                      </Button> */}
                     </div>
                   </div>
 

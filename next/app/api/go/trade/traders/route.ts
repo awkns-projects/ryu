@@ -64,10 +64,15 @@ export async function GET(request: NextRequest) {
     }
 
     const data = await response.json()
-    
+
     // Handle both array response and object with traders property
     const tradersArray = Array.isArray(data) ? data : (data.traders || [])
     console.log('✅ [API Route] Traders fetched:', tradersArray.length)
+
+    // Log first trader's raw data to see what fields are available
+    if (tradersArray.length > 0) {
+      console.log('📊 [API Route] Sample trader raw data:', JSON.stringify(tradersArray[0], null, 2))
+    }
 
     // Fetch detailed config for each trader to get trading symbols and other data
     const agentsPromises = tradersArray.map(async (trader: BackendTrader) => {
@@ -83,7 +88,7 @@ export async function GET(request: NextRequest) {
             'Authorization': authHeader,
           },
         })
-        
+
         if (configResponse.ok) {
           const config = await configResponse.json()
           // Parse trading symbols (e.g., "BTCUSDT,ETHUSDT" -> ["BTC", "ETH"])
@@ -102,7 +107,7 @@ export async function GET(request: NextRequest) {
       let pnlString = '+$0.00'
       let pnlPercent = 0
       let totalActions = 0
-      
+
       try {
         const accountResponse = await fetch(`${BACKEND_URL}/api/account?trader_id=${trader.trader_id}`, {
           headers: {
@@ -110,7 +115,7 @@ export async function GET(request: NextRequest) {
             'Authorization': authHeader,
           },
         })
-        
+
         if (accountResponse.ok) {
           const account = await accountResponse.json()
           const pnlValue = account.total_pnl || 0
