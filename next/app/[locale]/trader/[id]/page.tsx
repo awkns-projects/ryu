@@ -81,8 +81,9 @@ export default function TraderDetailPage({ params }: TraderDetailProps) {
     // If user is logged in, try authenticated endpoint first (via Next.js API route)
     if (token) {
       try {
-        const authUrl = `/api/go/trade/trader-config/${traderId}`
-        console.log('🔐 Trying authenticated endpoint:', authUrl)
+        // Use new direct database endpoint to avoid JOIN query failures
+        const authUrl = `/api/go/trade/trader-direct/${traderId}`
+        console.log('🔐 Trying authenticated endpoint (direct DB):', authUrl)
         const authResponse = await fetch(authUrl, {
           headers: {
             'Authorization': `Bearer ${token}`,
