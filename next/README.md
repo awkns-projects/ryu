@@ -60,3 +60,4 @@ This is a [Next.js](https://nextjs.org) project built with:
 ## Documentation
 
 Comprehensive documentation is available in the `/docs` folder in both English and Traditional Chinese.
+
