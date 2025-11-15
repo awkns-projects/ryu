@@ -188,7 +188,8 @@ export async function GET(request: NextRequest) {
         pnlPercent,
         winRate,
         walletAddress,
-      } as EnhancedAgent
+        exchange_id: row?.exchange_id || trader.exchange_id || 'hyperliquid', // Include exchange_id for wallet fetching
+      } as EnhancedAgent & { exchange_id: string }
     })
 
     const agents = await Promise.all(agentsPromises)

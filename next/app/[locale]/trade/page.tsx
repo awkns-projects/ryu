@@ -387,64 +387,91 @@ export default function TradePage() {
     try {
       console.log(`🔄 Fetching wallet address for trader ${agentId}...`)
 
-      // Find the agent to get required balance
+      // Find the agent to get required balance and wallet address
       const agent = agents.find(a => a.id === agentId)
       const requiredBalance = agent?.deposit || 0
+      
+      // Try to get wallet address from agent object first (from traders-enhanced API)
+      let walletAddress = (agent as any)?.walletAddress || ''
 
-      // Step 1: Fetch trader config to get the exchange_id (using direct DB access)
-      const traderResponse = await fetch(`/api/go/trade/trader-direct/${agentId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      })
+      // If not found in agent object, try fetching from exchange config
+      if (!walletAddress) {
+        console.log('💡 Wallet address not in agent object, fetching from exchange config...')
+        
+        // Step 1: Fetch trader config to get the exchange_id (using direct DB access)
+        let exchangeId: string | null = null
+        
+        try {
+          const traderResponse = await fetch(`/api/go/trade/trader-direct/${agentId}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+          })
 
-      if (!traderResponse.ok) {
-        throw new Error('Failed to fetch trader configuration')
+          if (traderResponse.ok) {
+            const traderData = await traderResponse.json()
+            exchangeId = traderData.exchange_id
+            console.log('📊 Trader data received:', traderData)
+          } else {
+            console.warn('⚠️ Could not fetch trader-direct, trying alternative method...')
+          }
+        } catch (err) {
+          console.warn('⚠️ Failed to fetch trader-direct:', err)
+        }
+
+        // If we still don't have exchange_id, try to get it from agent object
+        if (!exchangeId && agent) {
+          // Try to infer from agent data
+          const agentAny = agent as any
+          exchangeId = agentAny.exchange_id || agentAny.exchange || null
+        }
+
+        // If still no exchange_id, default to 'hyperliquid' (since all traders currently use Hyperliquid)
+        if (!exchangeId) {
+          console.warn('⚠️ No exchange_id found, defaulting to hyperliquid')
+          exchangeId = 'hyperliquid'
+        }
+
+        console.log(`🔍 Trader uses exchange: ${exchangeId}`)
+
+        // Step 2: Fetch exchange configs to get wallet address
+        try {
+          const exchangesResponse = await fetch('/api/go/trade/exchanges', {
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+          })
+
+          if (exchangesResponse.ok) {
+            const exchangesData = await exchangesResponse.json()
+            console.log('📊 Exchanges data received:', exchangesData)
+
+            // Find the specific exchange config by ID
+            const exchanges = exchangesData.exchanges || exchangesData
+            const exchange = Array.isArray(exchanges)
+              ? exchanges.find((ex: any) => ex.id === exchangeId)
+              : null
+
+            console.log('🔍 Exchange found:', exchange)
+
+            // Check for wallet address with multiple possible field names
+            walletAddress = exchange?.hyperliquid_wallet_addr || exchange?.wallet_address || exchange?.hyperliquidWalletAddr || ''
+          } else {
+            console.warn('⚠️ Failed to fetch exchange configurations')
+          }
+        } catch (err) {
+          console.error('❌ Error fetching exchanges:', err)
+        }
       }
 
-      const traderData = await traderResponse.json()
-      console.log('📊 Trader data received:', traderData)
-
-      const exchangeId = traderData.exchange_id
-      if (!exchangeId) {
-        console.error('❌ No exchange_id found for trader')
-        alert('No exchange configuration found for this trader.')
-        return
-      }
-
-      console.log(`🔍 Trader uses exchange: ${exchangeId}`)
-
-      // Step 2: Fetch exchange configs to get wallet address
-      const exchangesResponse = await fetch('/api/go/trade/exchanges', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-
-      if (!exchangesResponse.ok) {
-        throw new Error('Failed to fetch exchange configurations')
-      }
-
-      const exchangesData = await exchangesResponse.json()
-      console.log('📊 Exchanges data received:', exchangesData)
-
-      // Find the specific exchange config by ID
-      const exchanges = exchangesData.exchanges || exchangesData
-      const exchange = Array.isArray(exchanges)
-        ? exchanges.find((ex: any) => ex.id === exchangeId)
-        : null
-
-      console.log('🔍 Exchange found:', exchange)
-
-      // Check for wallet address with multiple possible field names
-      const walletAddress = exchange?.hyperliquid_wallet_addr || exchange?.wallet_address || exchange?.hyperliquidWalletAddr
-
-      if (!exchange || !walletAddress) {
-        console.error('❌ No wallet address found. Exchange:', exchange)
-        console.error('❌ Available fields:', exchange ? Object.keys(exchange) : 'none')
-        alert('No wallet address found for this trader. Please contact support.')
+      if (!walletAddress) {
+        console.error('❌ No wallet address found for Hyperliquid trader')
+        alert('No wallet address found for this trader. This may happen if:\n' +
+              '1. The exchange configuration is incomplete\n' +
+              '2. The trader was created before wallet generation was implemented\n\n' +
+              'Please try creating a new trader, or contact support if this persists.')
         return
       }
 
