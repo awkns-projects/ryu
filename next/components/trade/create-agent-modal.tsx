@@ -4,7 +4,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2, DollarSign, Check, ChevronRight, ChevronLeft } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Loader2, DollarSign, Check, ChevronRight, ChevronLeft, Brain } from "lucide-react"
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from "@/lib/utils"
 
@@ -37,6 +38,9 @@ interface CreateAgentModalProps {
   isCreating: boolean
   purchasedTemplates: PromptTemplate[]
   cryptoAssets: CryptoAsset[]
+  selectedAIModel: string
+  availableAIModels: any[]
+  isLoadingModels: boolean
   onAgentNameChange: (value: string) => void
   onTemplateSelect: (template: PromptTemplate | null) => void
   onCustomPromptChange: (value: string) => void
@@ -44,6 +48,7 @@ interface CreateAgentModalProps {
   onAssetsChange: (assets: string[]) => void
   onDepositChange: (value: string) => void
   onLeverageChange: (value: number) => void
+  onAIModelChange: (value: string) => void
   onNext: () => void
   onPrevious: () => void
   onCreate: () => void
@@ -68,6 +73,9 @@ export function CreateAgentModal({
   isCreating,
   purchasedTemplates,
   cryptoAssets,
+  selectedAIModel,
+  availableAIModels,
+  isLoadingModels,
   onAgentNameChange,
   onTemplateSelect,
   onCustomPromptChange,
@@ -75,6 +83,7 @@ export function CreateAgentModal({
   onAssetsChange,
   onDepositChange,
   onLeverageChange,
+  onAIModelChange,
   onNext,
   onPrevious,
   onCreate,
@@ -138,7 +147,7 @@ export function CreateAgentModal({
         {/* Step Content */}
         <div className="min-h-[400px] relative overflow-hidden">
           <AnimatePresence mode="wait" custom={stepDirection}>
-            {/* Step 1: Agent Name */}
+            {/* Step 1: Agent Name & AI Model */}
             {currentStep === 1 && (
               <motion.div
                 key="step-1"
@@ -165,12 +174,74 @@ export function CreateAgentModal({
                   <h3 className="text-lg font-semibold mb-2 text-white">{t('step1Title')}</h3>
                   <p className="text-sm text-white/60 mb-4">{t('step1Description')}</p>
                 </div>
-                <Input
-                  placeholder={t('agentNamePlaceholder')}
-                  value={agentName}
-                  onChange={(e) => onAgentNameChange(e.target.value)}
-                  className="text-lg p-6"
-                />
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-white/80 mb-2 block">Agent Name</label>
+                    <Input
+                      placeholder={t('agentNamePlaceholder')}
+                      value={agentName}
+                      onChange={(e) => onAgentNameChange(e.target.value)}
+                      className="text-lg p-6"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-white/80 mb-2 block flex items-center gap-2">
+                      <Brain className="w-4 h-4" />
+                      AI Model
+                    </label>
+                    {isLoadingModels ? (
+                      <div className="flex items-center gap-2 p-6 border border-white/10 rounded-lg bg-white/[0.02]">
+                        <Loader2 className="w-4 h-4 animate-spin text-white/60" />
+                        <span className="text-white/60">Loading models...</span>
+                      </div>
+                    ) : availableAIModels.length > 0 ? (
+                      <Select value={selectedAIModel} onValueChange={onAIModelChange}>
+                        <SelectTrigger className="text-lg p-6 h-auto">
+                          <SelectValue placeholder="Select AI Model">
+                            {availableAIModels.find(m => (m.id || m.provider) === selectedAIModel)?.name || 
+                             availableAIModels.find(m => (m.id || m.provider) === selectedAIModel)?.provider ||
+                             'Select AI Model'}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableAIModels.map((model) => {
+                            const modelId = model.id || model.provider
+                            const modelName = model.name || model.provider || modelId
+                            const isCustom = model.provider?.toLowerCase() === 'custom' || model.custom_api_url
+                            return (
+                              <SelectItem key={modelId} value={modelId}>
+                                <div className="flex items-center gap-2">
+                                  <span>{modelName}</span>
+                                  {isCustom && (
+                                    <span className="text-xs text-white/40">({model.custom_model_name || 'Custom'})</span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <div className="p-6 border border-yellow-500/20 rounded-lg bg-yellow-500/5">
+                        <p className="text-sm text-yellow-400 mb-3">
+                          No AI models configured. Please configure an AI model (e.g., DeepSeek or OpenAI) in settings first.
+                        </p>
+                        <Button
+                          onClick={() => {
+                            onClose()
+                            const locale = window.location.pathname.split('/')[1] || 'en'
+                            window.location.href = `/${locale}/settings`
+                          }}
+                          variant="outline"
+                          size="sm"
+                          className="border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/10"
+                        >
+                          Go to Settings
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </motion.div>
             )}
 

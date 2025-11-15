@@ -12,4 +12,6 @@ export { DecisionLogsTab } from './DecisionLogsTab'
 export { StatisticsTab } from './StatisticsTab'
 export { EquityChart } from './EquityChart'
 export { AILearningTab } from './AILearningTab'
+export { TraderDashboard } from './TraderDashboard'
+export { PositionsTable } from './PositionsTable'
 

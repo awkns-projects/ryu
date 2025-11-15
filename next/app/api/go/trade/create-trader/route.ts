@@ -50,10 +50,12 @@ export async function POST(request: NextRequest) {
     })
 
     // ====================================
-    // 🔐 STEP 1: Auto-find/create DeepSeek AI Model
+    // 🔐 STEP 1: Find/create AI Model (supports any model including OpenAI)
     // ====================================
-    let aiModelId = 'deepseek' // Always default to DeepSeek
-    console.log(`🔍 Searching for DeepSeek AI model...`)
+    // Use ai_model_id from request body, or default to 'deepseek'
+    let requestedModelId = body.ai_model_id || 'deepseek'
+    let aiModelId = requestedModelId
+    console.log(`🔍 Searching for AI model: ${requestedModelId}...`)
 
     // Check if AI model exists (use /api/models endpoint)
     const aiModelsResponse = await fetch(`${BACKEND_URL}/api/models`, {
@@ -69,82 +71,130 @@ export async function POST(request: NextRequest) {
       const aiModelsData = await aiModelsResponse.json()
       console.log(`📊 AI models data:`, aiModelsData)
 
-      // Response is an array directly, not wrapped in an object
-      // ALWAYS search for DeepSeek by provider first (most reliable)
+      // Find the requested model by provider or ID
       let existingModel = Array.isArray(aiModelsData)
-        ? aiModelsData.find((m: any) => m.provider === 'deepseek' || m.provider === 'DeepSeek')
+        ? aiModelsData.find((m: any) => 
+            m.provider?.toLowerCase() === requestedModelId.toLowerCase() ||
+            m.id?.toLowerCase() === requestedModelId.toLowerCase()
+          )
         : null
-
-      // If not found by provider, try exact ID match as fallback
-      if (!existingModel) {
-        existingModel = Array.isArray(aiModelsData)
-          ? aiModelsData.find((m: any) => m.id === 'deepseek' || m.id === 'DeepSeek')
-          : null
-      }
 
       if (existingModel) {
         // Use the existing model's actual ID
         aiModelId = existingModel.id
-        console.log(`✅ Found existing DeepSeek model with ID: ${aiModelId}`)
-      }
-
-      console.log(`🔎 DeepSeek AI model found:`, !!existingModel)
-
-      if (!existingModel) {
-        console.log(`💡 DeepSeek AI model not found, creating...`)
-
-        // Get DeepSeek API key from environment
-        const deepseekApiKey = process.env.DEEPSEEK_API_KEY
-
-        if (!deepseekApiKey) {
-          return NextResponse.json(
-            { error: 'DEEPSEEK_API_KEY environment variable is not set. Please configure it first.' },
-            { status: 400 }
-          )
-        }
-
-        // Create DeepSeek AI model using updateAIModelConfig
-        try {
-          const { updateAIModelConfig } = await import('@/lib/go-crypto')
-
-          await updateAIModelConfig(authHeader, 'deepseek', {
-            enabled: true,
-            api_key: deepseekApiKey,
-            custom_api_url: '',
-            custom_model_name: '',
-          })
-
-          console.log('✅ DeepSeek AI model created successfully')
-
-          // Re-fetch AI models to get the actual ID that was created
-          const refreshedResponse = await fetch(`${BACKEND_URL}/api/models`, {
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': authHeader,
-            },
-          })
-
-          if (refreshedResponse.ok) {
-            const refreshedData = await refreshedResponse.json()
-            const createdModel = Array.isArray(refreshedData)
-              ? refreshedData.find((m: any) => m.provider === 'deepseek' || m.provider === 'DeepSeek')
-              : null
-
-            if (createdModel) {
-              aiModelId = createdModel.id
-              console.log(`✅ Using created DeepSeek AI model ID: ${aiModelId}`)
-            }
-          }
-        } catch (error) {
-          console.error('❌ Failed to create DeepSeek AI model:', error)
-          return NextResponse.json(
-            { error: `Failed to create DeepSeek AI model: ${error instanceof Error ? error.message : 'Unknown error'}` },
-            { status: 500 }
-          )
-        }
+        console.log(`✅ Found existing ${requestedModelId} model with ID: ${aiModelId}`)
       } else {
-        console.log(`✅ DeepSeek AI model already exists with ID: ${aiModelId}`)
+        console.log(`💡 ${requestedModelId} AI model not found, attempting to create...`)
+
+        // Auto-create model based on type
+        if (requestedModelId.toLowerCase() === 'deepseek') {
+          // Create DeepSeek AI model
+          const deepseekApiKey = process.env.DEEPSEEK_API_KEY
+
+          if (!deepseekApiKey) {
+            return NextResponse.json(
+              { error: 'DEEPSEEK_API_KEY environment variable is not set. Please configure it first.' },
+              { status: 400 }
+            )
+          }
+
+          try {
+            const { updateAIModelConfig } = await import('@/lib/go-crypto')
+            console.log('🔐 Attempting to create DeepSeek AI model with encryption...')
+            await updateAIModelConfig(authHeader, 'deepseek', {
+              enabled: true,
+              api_key: deepseekApiKey,
+              custom_api_url: '',
+              custom_model_name: '',
+            })
+            console.log('✅ DeepSeek AI model created successfully')
+          } catch (error) {
+            console.error('❌ Failed to create DeepSeek AI model:', error)
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            return NextResponse.json(
+              { 
+                error: `Failed to create DeepSeek AI model: ${errorMessage}. Please ensure DEEPSEEK_API_KEY is set correctly.`,
+                details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+              },
+              { status: 500 }
+            )
+          }
+        } else if (requestedModelId.toLowerCase() === 'openai' || requestedModelId.toLowerCase() === 'custom') {
+          // Create OpenAI/custom AI model
+          const openaiApiKey = process.env.OPENAI_API_KEY
+
+          if (!openaiApiKey) {
+            return NextResponse.json(
+              { error: 'OPENAI_API_KEY environment variable is not set. Please configure it first, or configure OpenAI manually through the settings.' },
+              { status: 400 }
+            )
+          }
+
+          try {
+            const { updateAIModelConfig } = await import('@/lib/go-crypto')
+            console.log('🔐 Attempting to create OpenAI/custom AI model with encryption...')
+            
+            // Use 'custom' as the provider ID for OpenAI (Go backend supports this)
+            await updateAIModelConfig(authHeader, 'custom', {
+              enabled: true,
+              api_key: openaiApiKey,
+              custom_api_url: 'https://api.openai.com/v1',
+              custom_model_name: process.env.OPENAI_MODEL_NAME || 'gpt-4o',
+            })
+            console.log('✅ OpenAI/custom AI model created successfully')
+            aiModelId = 'custom' // Use 'custom' as the model ID
+          } catch (error) {
+            console.error('❌ Failed to create OpenAI AI model:', error)
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            return NextResponse.json(
+              { 
+                error: `Failed to create OpenAI AI model: ${errorMessage}. Please ensure OPENAI_API_KEY is set correctly, or configure OpenAI manually through the settings.`,
+                details: process.env.NODE_ENV === 'development' ? errorMessage : undefined
+              },
+              { status: 500 }
+            )
+          }
+        } else {
+          // For other models, just use the requested ID (user should configure it manually first)
+          console.log(`⚠️ Model ${requestedModelId} not found and cannot be auto-created. Using requested ID.`)
+          console.log(`💡 Please ensure the model is configured in settings before creating the trader.`)
+          aiModelId = requestedModelId
+        }
+
+        // Re-fetch AI models to get the actual ID that was created
+        const refreshedResponse = await fetch(`${BACKEND_URL}/api/models`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authHeader,
+          },
+        })
+
+        if (refreshedResponse.ok) {
+          const refreshedData = await refreshedResponse.json()
+          const createdModel = Array.isArray(refreshedData)
+            ? refreshedData.find((m: any) => 
+                m.provider?.toLowerCase() === requestedModelId.toLowerCase() ||
+                m.id?.toLowerCase() === requestedModelId.toLowerCase() ||
+                m.id?.toLowerCase() === 'custom'
+              )
+            : null
+
+          if (createdModel) {
+            aiModelId = createdModel.id
+            console.log(`✅ Using created ${requestedModelId} AI model ID: ${aiModelId}`)
+          } else {
+            console.warn(`⚠️ ${requestedModelId} model created but not found in refreshed list, using requested ID`)
+            aiModelId = requestedModelId
+          }
+        } else {
+          console.warn(`⚠️ Failed to refresh AI models list, using requested ID`)
+          aiModelId = requestedModelId
+        }
       }
+    } else {
+      // If we can't fetch models, just use the requested ID
+      console.warn(`⚠️ Failed to fetch AI models list, using requested ID: ${requestedModelId}`)
+      aiModelId = requestedModelId
     }
 
     // ====================================
@@ -258,8 +308,16 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
       console.error(`❌ [API Route] Backend error: ${response.status}`, errorData)
+      console.error(`❌ [API Route] Full error response:`, JSON.stringify(errorData, null, 2))
+      
+      // Provide more detailed error message
+      const errorMessage = errorData.error || errorData.message || 'Failed to create trader'
       return NextResponse.json(
-        { error: errorData.error || 'Failed to create trader' },
+        { 
+          error: errorMessage,
+          details: errorData.details || (process.env.NODE_ENV === 'development' ? errorData : undefined),
+          status: response.status
+        },
         { status: response.status }
       )
     }

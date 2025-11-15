@@ -22,10 +22,14 @@ export async function GET(
       )
     }
 
-    console.log(`🔄 [API] Fetching latest decisions for trader ${traderId}...`)
+    // Get limit from query params (default to 5)
+    const { searchParams } = new URL(request.url)
+    const limit = searchParams.get('limit') || '5'
+
+    console.log(`🔄 [API] Fetching latest decisions for trader ${traderId} (limit: ${limit})...`)
 
     const response = await fetch(
-      `${BACKEND_URL}/api/decisions/latest?trader_id=${traderId}`,
+      `${BACKEND_URL}/api/decisions/latest?trader_id=${traderId}&limit=${limit}`,
       {
         method: 'GET',
         headers: {
