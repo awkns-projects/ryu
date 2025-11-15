@@ -6,7 +6,9 @@ let db: Database.Database | null = null
 
 export function getDatabase(): Database.Database {
   if (!db) {
+    // Use SQLITE_DB_PATH for Docker (e.g., /data/config.db), fallback to DATABASE_PATH, then default path
     const dbPath = process.env.SQLITE_DB_PATH ||
+      process.env.DATABASE_PATH ||
       path.join(process.cwd(), '../config.db')
 
     try {
